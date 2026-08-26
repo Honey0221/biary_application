@@ -10,6 +10,8 @@ class BiaryTextField extends StatefulWidget {
     this.errorText,
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
+    this.textInputAction = TextInputAction.done,
+    this.focusNode,
     this.onChanged,
     this.onSubmitted,
     this.enabled = true,
@@ -22,6 +24,8 @@ class BiaryTextField extends StatefulWidget {
   final String? errorText;
   final bool obscureText;
   final TextInputType keyboardType;
+  final TextInputAction textInputAction;
+  final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final bool enabled;
@@ -33,17 +37,33 @@ class BiaryTextField extends StatefulWidget {
 }
 
 class _BiaryTextFieldState extends State<BiaryTextField> {
-  final _focusNode = FocusNode();
+  final _internalFocusNode = FocusNode();
+  late FocusNode _effectiveFocusNode;
+
+  void _listener() => setState(() {});
 
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(() => setState(() {}));
+    _effectiveFocusNode = widget.focusNode ?? _internalFocusNode;
+    _effectiveFocusNode.addListener(_listener);
+  }
+
+
+  @override
+  void didUpdateWidget(BiaryTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusNode != oldWidget.focusNode) {
+      _effectiveFocusNode.removeListener(_listener);
+      _effectiveFocusNode = widget.focusNode ?? _internalFocusNode;
+      _effectiveFocusNode.addListener(_listener);
+    }
   }
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    _effectiveFocusNode.removeListener(_listener);
+    _internalFocusNode.dispose();
     super.dispose();
   }
 
@@ -53,11 +73,11 @@ class _BiaryTextFieldState extends State<BiaryTextField> {
     if (hasError) {
       return BorderSide(
         color: AppColors.error,
-        width: _focusNode.hasFocus ? 1.5 : 1.0
+        width: _effectiveFocusNode.hasFocus ? 1.5 : 1.0
       );
     }
 
-    if (_focusNode.hasFocus) {
+    if (_effectiveFocusNode.hasFocus) {
       return const BorderSide(color: AppColors.primaryBrown, width: 1.5);
     }
 
@@ -78,9 +98,10 @@ class _BiaryTextFieldState extends State<BiaryTextField> {
       children: [
         TextField(
           controller: widget.controller,
-          focusNode: _focusNode,
+          focusNode: _effectiveFocusNode,
           obscureText: widget.obscureText,
           keyboardType: widget.keyboardType,
+          textInputAction: widget.textInputAction,
           onChanged: widget.onChanged,
           onSubmitted: widget.onSubmitted,
           enabled: widget.enabled,

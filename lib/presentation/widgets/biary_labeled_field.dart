@@ -12,10 +12,13 @@ class BiaryLabeledField extends StatelessWidget {
     this.errorText,
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
+    this.textInputAction = TextInputAction.done,
+    this.focusNode,
     this.maxLines = 1,
     this.suffixIcon,
     this.isRequired = false,
-    this.onChanged
+    this.onChanged,
+    this.onSubmitted
   });
 
   final String label;
@@ -24,10 +27,13 @@ class BiaryLabeledField extends StatelessWidget {
   final String? errorText;
   final bool obscureText;
   final TextInputType keyboardType;
+  final TextInputAction textInputAction;
+  final FocusNode? focusNode;
   final int maxLines;
   final Widget? suffixIcon;
   final bool isRequired;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -61,9 +67,12 @@ class BiaryLabeledField extends StatelessWidget {
           errorText: errorText,
           obscureText: obscureText,
           keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          focusNode: focusNode,
           maxLines: maxLines,
           suffixIcon: suffixIcon,
-          onChanged: onChanged
+          onChanged: onChanged,
+          onSubmitted: onSubmitted
         )
       ],
     );
