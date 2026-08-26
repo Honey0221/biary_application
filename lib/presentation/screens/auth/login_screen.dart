@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
@@ -90,31 +91,18 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 14),
               // 아이디 찾기 | 비밀번호 찾기
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  BiaryTextLink(label: '아이디 찾기', onTap: () {
-                    // TODO : 아이디 찾기 로직 추가 예정
-                  }),
-                  Container(
-                    width: 1,
-                    height: 12,
-                    margin: const EdgeInsets.symmetric(horizontal: 14),
-                    color: AppColors.inputBorder
-                  ),
-                  BiaryTextLink(label: '비밀번호 찾기', onTap: () {
-                    // TODO : 비밀번호 찾기 로직 추가 예정
-                  })
-                ]
+              Center(
+                child: BiaryTextLink(
+                  label: '비밀번호 찾기',
+                  onTap: () => context.push('/find-password')
+                )
               ),
               const SizedBox(height: 24),
               // 회원가입 버튼
               BiaryButton(
                 label: '회원가입',
                 type: BiaryButtonType.outlined,
-                onPressed: () {
-                  // TODO: 회원가입 화면 이동 예정
-                }
+                onPressed: () => context.push('/signup')
               ),
               const SizedBox(height: 24),
               // 구분선
