@@ -11,6 +11,7 @@ import 'package:honey/core/constants/app_fonts.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // env 파일 로드
   await dotenv.load(fileName: ".env");
 
   // Supabase 초기화
