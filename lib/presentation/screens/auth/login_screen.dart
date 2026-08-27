@@ -18,16 +18,16 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
     super.dispose();
   }
 
@@ -73,6 +73,41 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+  
+  // 일반 로그인
+  Future<void> _signInWithEmail() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이메일과 비밀번호를 입력해주세요.'))
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await supabase.auth.signInWithPassword(
+        email: email,
+        password: password
+      );
+      if (!mounted) return;
+      context.go('/home');
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message))
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('로그인 중 오류가 발생했습니다.'))
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,14 +144,14 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 48),
               // 이메일 입력
               BiaryTextField(
-                controller: _emailController,
+                controller: _emailCtrl,
                 hint: '이메일',
                 keyboardType: TextInputType.emailAddress
               ),
               const SizedBox(height: 12),
               // 비밀번호 입력
               BiaryTextField(
-                controller: _passwordController,
+                controller: _passwordCtrl,
                 hint: '비밀번호',
                 obscureText: _obscurePassword,
                 suffixIcon: IconButton(
@@ -134,9 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // 로그인 버튼
               BiaryButton(
                 label: '로그인',
-                onPressed: () {
-                  // TODO : 로그인 로직 추가 예정
-                },
+                onPressed: _isLoading ? null : _signInWithEmail,
               ),
               const SizedBox(height: 14),
               // 아이디 찾기 | 비밀번호 찾기
