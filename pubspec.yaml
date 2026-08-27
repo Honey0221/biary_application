@@ -71,6 +71,9 @@ dependencies:
   # 앱 버전 정보 읽기
   package_info_plus: ^8.3.0
 
+  # 구글 로그인
+  google_sign_in: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

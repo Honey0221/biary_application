@@ -34,6 +34,10 @@ android {
     }
 }
 
+dependencies {
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
