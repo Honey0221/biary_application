@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:honey/main.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_checkbox_tile.dart';
 import 'package:honey/presentation/widgets/biary_text_field.dart';
@@ -106,7 +107,22 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      // TODO: Phase 2 - Supabase 닉네임 중복 조회 로직 구현 예정
+      final response = await supabase
+          .from('users')
+          .select('id')
+          .eq('display_name', _nicknameCtrl.text.trim())
+          .maybeSingle();
+      final isDuplicate = response != null;
+      setState(() {
+        _nicknameChecked = true;
+        _nicknameAvailable = !isDuplicate;
+        _nicknameError = isDuplicate ? '이미 사용 중인 닉네임입니다.' : null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('닉네임 확인 중 오류가 발생했습니다.'))
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -131,7 +147,11 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      // TODO: Supabase 회원가입 로직 구현
+      await supabase.auth.signUp(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+        data: {'display_name': _nicknameCtrl.text.trim()}
+      );
       if (!mounted) return;
       await showDialog(
         context: context,
@@ -256,6 +276,8 @@ class _SignupScreenState extends State<SignupScreen> {
                       child: BiaryTextField(
                         controller: _nicknameCtrl,
                         hint: '닉네임 (2~20자)',
+                        focusNode: _nicknameFocus,
+                        textInputAction: TextInputAction.done,
                         errorText: _nicknameError,
                         onChanged: (_) => setState(() {
                           _nicknameError = null;
