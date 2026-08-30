@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:honey/main.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_checkbox_tile.dart';
+import 'package:honey/presentation/widgets/biary_dialog.dart';
 import 'package:honey/presentation/widgets/biary_text_field.dart';
+import 'package:honey/providers/auth_provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/presentation/widgets/loading_overlay.dart';
 
-class SignupScreen extends StatefulWidget {
+class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _passwordConfirmCtrl = TextEditingController();
@@ -107,16 +109,12 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      final response = await supabase
-          .from('users')
-          .select('id')
-          .eq('display_name', _nicknameCtrl.text.trim())
-          .maybeSingle();
-      final isDuplicate = response != null;
+      final isTaken = await ref.read(authRepositoryProvider)
+        .isNicknameTaken(_nicknameCtrl.text.trim());
       setState(() {
         _nicknameChecked = true;
-        _nicknameAvailable = !isDuplicate;
-        _nicknameError = isDuplicate ? '이미 사용 중인 닉네임입니다.' : null;
+        _nicknameAvailable = !isTaken;
+        _nicknameError = isTaken ? '이미 사용 중인 닉네임입니다.' : null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -147,38 +145,17 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      await supabase.auth.signUp(
-        email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text,
-        data: {'display_name': _nicknameCtrl.text.trim()}
-      );
+      await ref.read(authRepositoryProvider)
+        .signUp(_emailCtrl.text.trim(), _passwordCtrl.text, _nicknameCtrl.text.trim());
       if (!mounted) return;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text('회원가입 완료'),
-          content: const Text('바이어리에 오신 것을 환영해요!\n아이 프로필을 등록하시겠어요?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                context.go('/home');
-              },
-              child: const Text('다음에')
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                context.go('/child/new');
-              },
-              child: const Text(
-                '이동',
-                style: TextStyle(color: AppColors.primaryBrown)
-              )
-            )
-          ]
-        )
+      await BiaryDialog.show(
+        context,
+        title: '회원가입 완료',
+        content: '바이어리에 오신 것을 환영해요!\n아이 프로필을 등록하시겠어요?',
+        cancelLabel: '다음에',
+        confirmLabel: '이동',
+        onCancel: () => context.go('/home'),
+        onConfirm: () => context.go('/child/new')
       );
     } catch (e) {
       if (!mounted) return;

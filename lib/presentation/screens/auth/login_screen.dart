@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:honey/providers/auth_provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:honey/main.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_text_field.dart';
 import 'package:honey/presentation/widgets/biary_text_link.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
 
@@ -31,49 +30,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // 구글 로그인
-  Future<void> _signInWithGoogle() async {
-    setState(() => _isLoading = true);
-    try {
-      final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID'];
-      if (webClientId == null) {
-        throw Exception('Google 클라이언트 ID가 설정되지 않았습니다.');
-      }
-      final googleSignIn = GoogleSignIn(serverClientId: webClientId);
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) return;
-
-      final googleAuth = await googleUser.authentication;
-      final accessToken = googleAuth.accessToken;
-      final idToken = googleAuth.idToken;
-
-      if (accessToken == null || idToken == null) {
-        throw Exception('Google 인증 토큰을 가져올 수 없습니다.');
-      }
-
-      await supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken
-      );
-
-      if (!mounted) return;
-      context.go('/home');
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message))
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('구글 로그인 중 오류가 발생했습니다.'))
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-  
   // 일반 로그인
   Future<void> _signInWithEmail() async {
     final email = _emailCtrl.text.trim();
@@ -88,10 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await supabase.auth.signInWithPassword(
-        email: email,
-        password: password
-      );
+      await ref.read(authRepositoryProvider).signInWithEmail(email, password);
       if (!mounted) return;
       context.go('/home');
     } on AuthException catch (e) {
@@ -102,7 +55,29 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('로그인 중 오류가 발생했습니다.'))
+        SnackBar(content: Text('로그인 중 오류가 발생했습니다.'))
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 구글 로그인
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(authRepositoryProvider).signInWithGoogle();
+      if (!mounted) return;
+      context.go('/home');
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message))
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('구글 로그인 중 오류가 발생했습니다.'))
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

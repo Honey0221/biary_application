@@ -1,25 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_text_field.dart';
+import 'package:honey/providers/auth_provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:honey/core/constants/app_colors.dart';
-import 'package:honey/main.dart';
 import 'package:honey/presentation/widgets/loading_overlay.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum _Step { email, otp, newPassword, done } // 패스워드 재설정 단계
 
-class FindPasswordScreen extends StatefulWidget {
+class FindPasswordScreen extends ConsumerStatefulWidget {
   const FindPasswordScreen({super.key});
 
   @override
-  State<FindPasswordScreen> createState() => _FindPasswordScreenState();
+  ConsumerState<FindPasswordScreen> createState() => _FindPasswordScreenState();
 }
 
-class _FindPasswordScreenState extends State<FindPasswordScreen> {
+class _FindPasswordScreenState extends ConsumerState<FindPasswordScreen> {
   _Step _step = _Step.email;
 
   final _emailCtrl = TextEditingController();
@@ -84,7 +85,7 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
     }
     setState(() { _isLoading = true; _emailError = null; });
     try {
-      await supabase.auth.signInWithOtp(email: email);
+      await ref.read(authRepositoryProvider).sendOtp(_emailCtrl.text.trim());
       if (!mounted) return;
       _startTimer();
       setState(() => _step = _Step.otp);
@@ -116,11 +117,8 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
     }
     setState(() { _isLoading = true; _otpError = null; });
     try {
-      await supabase.auth.verifyOTP(
-        email: _emailCtrl.text.trim(),
-        token: otp,
-        type: OtpType.email
-      );
+      await ref.read(authRepositoryProvider)
+        .verifyOtp(_emailCtrl.text.trim(), _otpCtrl.text.trim());
       if (!mounted) return;
       _timer?.cancel();
       setState(() => _step = _Step.newPassword);
@@ -161,9 +159,7 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await supabase.auth.updateUser(
-        UserAttributes(password: pw)
-      );
+      await ref.read(authRepositoryProvider).updatePassword(_newPasswordCtrl.text);
       if (!mounted) return;
       setState(() => _step = _Step.done);
     } on AuthException catch (e) {
