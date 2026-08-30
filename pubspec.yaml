@@ -75,8 +75,10 @@ dependencies:
   google_sign_in: ^6.2.1
 
 dev_dependencies:
+  # 테스트
   flutter_test:
     sdk: flutter
+  mocktail: ^1.0.5
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
