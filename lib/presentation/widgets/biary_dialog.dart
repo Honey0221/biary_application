@@ -75,14 +75,28 @@ class BiaryDialog extends StatelessWidget {
               onCancel?.call();
             },
             child: Text(
-              confirmLabel,
+              cancelLabel!,
               style: TextStyle(
-                color: isDangerous ? AppColors.error : AppColors.primaryBrown,
+                color: AppColors.textMedium,
                 fontSize: 14,
-                fontWeight: FontWeight.w600
+                fontWeight: FontWeight.w500
               )
             )
+          ),
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            onConfirm?.call();
+          },
+          child: Text(
+            confirmLabel,
+            style: TextStyle(
+              color: isDangerous ? AppColors.error : AppColors.primaryBrown,
+              fontSize: 14,
+              fontWeight: FontWeight.w600
+            )
           )
+        )
       ]
     );
   }
