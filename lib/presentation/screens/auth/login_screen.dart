@@ -19,6 +19,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -27,6 +29,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -35,10 +39,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
 
-    if (email.isEmpty || password.isEmpty) {
+    if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이메일과 비밀번호를 입력해주세요.'))
+        const SnackBar(content: Text('이메일을 입력해주세요.'))
       );
+      _emailFocus.requestFocus();
+      return;
+    }
+
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('비밀번호를 입력해주세요.'))
+      );
+      _passwordFocus.requestFocus();
       return;
     }
 
@@ -121,7 +134,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               BiaryTextField(
                 controller: _emailCtrl,
                 hint: '이메일',
-                keyboardType: TextInputType.emailAddress
+                keyboardType: TextInputType.emailAddress,
+                focusNode: _emailFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => _passwordFocus.requestFocus()
               ),
               const SizedBox(height: 12),
               // 비밀번호 입력
@@ -129,6 +145,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 controller: _passwordCtrl,
                 hint: '비밀번호',
                 obscureText: _obscurePassword,
+                focusNode: _passwordFocus,
+                textInputAction: TextInputAction.done,
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye,
@@ -200,9 +218,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Center(
                 child: BiaryTextLink(
                   label: '게스트로 입장하기',
-                  onTap: () {
-                    // TODO : 게스트 모드 구현 예정
-                  },
+                  onTap: () => context.push('/guest-entry'),
                   underline: true
                 )
               ),

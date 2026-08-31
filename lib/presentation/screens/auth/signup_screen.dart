@@ -136,7 +136,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   
   // 회원가입 처리
   Future<void> _submit() async {
-    if (!_validateAll()) return;
+    if (!_validateAll()) {
+      if (_emailError != null) {
+        _emailFocus.requestFocus();
+      } else if (_passwordError != null) {
+        _passwordFocus.requestFocus();
+      } else if (_passwordConfirmError != null) {
+        _passwordConfirmFocus.requestFocus();
+      } else if (_nicknameError != null) {
+        _nicknameFocus.requestFocus();
+      }
+      return;
+    }
     if (!_termsAgreed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('개인정보처리방침에 동의해주세요.'))
