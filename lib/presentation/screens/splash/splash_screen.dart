@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/core/utils/version_checker.dart';
+import 'package:honey/main.dart';
+import 'package:honey/presentation/widgets/biary_dialog.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,15 +23,38 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _loadVersionAndNavigate() async {
-    final version = await VersionChecker.getCurrentVersion();
-    if (mounted) setState(() => _version = version);
+    final current = await VersionChecker.getCurrentVersion();
+    if (mounted) setState(() => _version = current);
+
+    final minRequired = await VersionChecker.getMinRequiredVersion();
+    if (minRequired != null &&
+      VersionChecker.isUpdateRequired(current, minRequired)) {
+      if (!mounted) return;
+      await BiaryDialog.show(
+        context,
+        title: '업데이트 필요',
+        content: '서비스 이용을 위해 최신 버전으로 업데이트해주세요',
+        confirmLabel: '업데이트',
+        onConfirm: () async {
+          const url = 'https://play.google.com/store/apps/details?id=com.biary.app';
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        }
+      );
+      return;
+    }
 
     await Future.delayed(const Duration(seconds: 2));
-
     if (!mounted) return;
 
-    // TODO : 로그인 상태에 따른 화면 이동 로직 추가 예정
-    context.go('/login');
+    final session = supabase.auth.currentSession;
+    if (session != null) {
+      context.go('/home');
+    } else {
+      context.go('/login');
+    }
   }
 
   @override
