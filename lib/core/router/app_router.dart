@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:honey/presentation/screens/auth/find_password_screen.dart';
 import 'package:honey/presentation/screens/auth/guest_entry_screen.dart';
 import 'package:honey/presentation/screens/auth/signup_screen.dart';
+import 'package:honey/presentation/screens/home/guest_home_screen.dart';
 import 'package:honey/presentation/screens/home/home_screen.dart';
 import 'package:honey/presentation/screens/policy/terms_screen.dart';
 import 'package:honey/presentation/screens/splash/splash_screen.dart';
@@ -118,6 +119,13 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _modalPage(
         pageKey: state.pageKey,
         child: const GuestEntryScreen()
+      )
+    ),
+    GoRoute(
+      path: '/guest-home',
+      pageBuilder: (context, state) => _fadePage(
+        pageKey: state.pageKey,
+        child: const GuestHomeScreen()
       )
     )
     // 개발 진행하면서 여기에 라우트 추가
