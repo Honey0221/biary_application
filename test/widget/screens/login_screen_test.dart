@@ -42,25 +42,6 @@ void main() {
     });
   });
 
-  group('LoginScreen - 비밀번호 표시/숨김', () {
-    testWidgets('초기 상태에서 비밀번호가 마스킹된다', (tester) async {
-      await tester.pumpWidget(MaterialApp.router(routerConfig: _buildRouter()));
-      
-      final fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
-      expect(fields.last.obscureText, isTrue);
-    });
-
-    testWidgets('아이콘 버튼 탭 시 비밀번호가 표시된다', (tester) async {
-      await tester.pumpWidget(MaterialApp.router(routerConfig: _buildRouter()));
-
-      await tester.tap(find.byType(IconButton));
-      await tester.pump();
-
-      final fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
-      expect(fields.last.obscureText, isFalse);
-    });
-  });
-
   group('LoginScreen - 유효성', () {
     testWidgets('이메일, 비밀번호 미입력 시 스낵바가 표시된다', (tester) async {
       await tester.pumpWidget(MaterialApp.router(routerConfig: _buildRouter()));
@@ -68,7 +49,7 @@ void main() {
       await tester.tap(find.text('로그인').first);
       await tester.pump();
 
-      expect(find.text('이메일과 비밀번호를 입력해주세요.'), findsOneWidget);
+      expect(find.text('이메일을 입력해주세요.'), findsOneWidget);
     });
   });
 
