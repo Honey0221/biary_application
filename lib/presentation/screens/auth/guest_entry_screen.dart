@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/data/local/local_child_profile.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
@@ -28,6 +29,10 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
   String? _step2Error;
   final _foodControllers = <TextEditingController>[TextEditingController()];
   final _foodFocusNodes = <FocusNode>[FocusNode()];
+
+  bool get _hasAnyInput =>
+    _birthDate != null || _gender != null || _mealType != null ||
+    _foodControllers.any((c) => c.text.trim().isNotEmpty);
 
   @override
   void dispose() {
@@ -66,9 +71,6 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
       _foodFocusNodes.add(FocusNode());
       _step2Error = null;
     });
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _foodFocusNodes.last.requestFocus()
-    );
   }
 
   // 음식 필드 삭제
@@ -138,9 +140,13 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
       ..gender = _gender!;
     await box.add(profile);
 
+    final flagBox = await Hive.openBox<bool>('guestFlags');
+    await flagBox.put('hasCompletedFirstRecord', true);
+
     if (!mounted) return;
-    context.go('/home'); // Phase 5 완료 후 /guest-result로 교체할 때 아래 extra 사용
+    context.go('/guest-home'); // Phase 5 완료 후 /guest-result로 교체할 때 아래 extra 사용
     // context.go('/home', extra: {
+    //   'isGuest': true,
     //   'mealType': _mealType,
     //   'foods': _foodControllers
     //     .map((c) => c.text.trim())
@@ -152,11 +158,26 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
 
   // 뒤로 가기
   void _onPrev() {
-    if (_step == 2) {
-      setState(() { _step = 1; _goingForward = false; });
-    } else {
-      context.pop();
+    if (!_hasAnyInput) {
+      context.go('/login');
+      return;
     }
+
+    BiaryDialog.show(
+      context,
+      title: '작성 중인 내용이 있어요',
+      content: '지금 나가면 입력한 내용이 사라집니다.\n그래도 나가시겠어요?',
+      confirmLabel: '나가기',
+      cancelLabel: '계속 작성',
+      isDangerous: true,
+      onConfirm: () => context.go('/login'),
+      onCancel: () {}
+    );
+  }
+
+  // Step 1 이동
+  void _onGoToStep1() {
+    setState(() { _step = 1; _goingForward = false; });
   }
 
   @override
@@ -174,14 +195,29 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(
-                  onPressed: _onPrev,
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new,
-                    size: 20,
-                    color: AppColors.darkGray
-                  ),
-                  padding: EdgeInsets.zero
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      onPressed: _onPrev,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        size: 20,
+                        color: AppColors.darkGray
+                      ),
+                      padding: EdgeInsets.zero
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/guest-home'),
+                      child: const Text(
+                        '건너뛰기',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMedium
+                        )
+                      )
+                    )
+                  ]
                 ),
                 const SizedBox(height: 16),
                 _StepIndicator(currentStep: _step),
@@ -230,6 +266,7 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
                       onFoodChanged: () => setState(() => _step2Error = null),
                       onAddFood: _addFoodField,
                       onRemoveFood: _removeFoodField,
+                      onPrev: _onGoToStep1,
                       onAnalyze: _onAnalyze
                     )
                   )
@@ -355,6 +392,7 @@ class _GuestStep2 extends StatelessWidget {
     required this.onFoodChanged,
     required this.onAddFood,
     required this.onRemoveFood,
+    required this.onPrev,
     required this.onAnalyze
   });
 
@@ -366,6 +404,7 @@ class _GuestStep2 extends StatelessWidget {
   final VoidCallback onFoodChanged;
   final VoidCallback onAddFood;
   final void Function(int) onRemoveFood;
+  final VoidCallback onPrev;
   final VoidCallback onAnalyze;
 
   static const _mealTypes = ['아침', '점심', '저녁', '간식'];
@@ -410,7 +449,21 @@ class _GuestStep2 extends StatelessWidget {
           }).toList(),
         ),
         const SizedBox(height: 24),
-        const _FieldLabel('음식 목록'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const _FieldLabel('음식 목록'),
+            GestureDetector(
+              onTap: onAddFood,
+              child: const Icon(
+                Icons.add_circle_outline,
+                size: 22,
+                color: AppColors.primaryBrown
+              )
+            )
+          ]
+        ),
         const SizedBox(height: 8),
         Expanded(
           child: SingleChildScrollView(
@@ -476,36 +529,25 @@ class _GuestStep2 extends StatelessWidget {
                           GestureDetector(
                             onTap: () => onRemoveFood(idx),
                             child: Container(
-                              width: 28,
-                              height: 28,
+                              width: 32,
+                              height: 32,
                               decoration: BoxDecoration(
                                 color: AppColors.surfaceMuted,
                                 borderRadius: BorderRadius.circular(6)
                               ),
                               alignment: Alignment.center,
                               child: const Icon(
-                                Icons.close,
-                                size: 14,
+                                LucideIcons.trash2,
+                                size: 15,
                                 color: AppColors.textMedium
                               )
                             )
                           )
                         ]
                       ]
-                    ),
+                    )
                   );
                 }),
-                GestureDetector(
-                  onTap: onAddFood,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 6),
-                    child: Icon(
-                      Icons.add_circle_outline,
-                      size: 28,
-                      color: AppColors.primaryBrown
-                    )
-                  )
-                ),
                 if (errorText != null) ...[
                   const SizedBox(height: 6),
                   Text(
@@ -522,7 +564,37 @@ class _GuestStep2 extends StatelessWidget {
           )
         ),
         const SizedBox(height: 8),
-        BiaryButton(label: '분석 결과 보기', onPressed: onAnalyze)
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: onPrev,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: AppColors.primaryBrown),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)
+                  )
+                ),
+                child: const Text(
+                  '이전',
+                  style: TextStyle(
+                    color: AppColors.primaryBrown,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15
+                  )
+                )
+              )
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: BiaryButton(
+                label: '분석 결과 보기',
+                onPressed: onAnalyze
+              )
+            )
+          ]
+        )
       ]
     );
   }
@@ -536,41 +608,48 @@ class _StepIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Dot(label: '아이 정보', active: currentStep == 1, done: currentStep > 1),
-        Expanded(child: Container(height: 1, color: AppColors.inputBorder)),
-        _Dot(label: '식단 입력', active: currentStep == 2, done: false)
+        _Dot(label: '아이 정보', step: 1, active: currentStep == 1),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 13.5),
+            child: Container(height: 1, color: AppColors.inputBorder)
+          )
+        ),
+        _Dot(label: '식단 입력', step: 2, active: currentStep == 2)
       ]
     );
   }
 }
 
+// 스텝 인디케이터
 class _Dot extends StatelessWidget {
-  const _Dot({required this.label, required this.active, required this.done});
+  const _Dot({required this.label, required this.step, required this.active});
+
   final String label;
+  final int step;
   final bool active;
-  final bool done;
 
   @override
   Widget build(BuildContext context) {
-    final highlighted = active || done;
     return Column(
       children: [
         Container(
-          width: 28, height: 28,
+          width: 28,
+          height: 28,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: highlighted ? AppColors.primaryBrown : AppColors.inputBorder
+            color: active ? AppColors.primaryBrown : AppColors.inputBorder
           ),
           alignment: Alignment.center,
-          child: done ? const Icon(Icons.check, size: 14, color: Colors.white)
-            : Text(
-              active ? '1' : '2',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: active ? Colors.white : AppColors.grayCaption
-              )
+          child: Text(
+            '$step',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: active ? Colors.white : AppColors.grayCaption
+            )
           )
         ),
         const SizedBox(height: 4),
@@ -578,7 +657,7 @@ class _Dot extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 11,
-            color: highlighted ? AppColors.darkGray : AppColors.grayCaption
+            color: active ? AppColors.darkGray : AppColors.grayCaption
           )
         )
       ]
@@ -586,6 +665,7 @@ class _Dot extends StatelessWidget {
   }
 }
 
+// 필드 라벨
 class _FieldLabel extends StatelessWidget {
   const _FieldLabel(this.text);
   final String text;
@@ -601,6 +681,7 @@ class _FieldLabel extends StatelessWidget {
   );
 }
 
+// 성별 버튼
 class _GenderButton extends StatelessWidget {
   const _GenderButton({
     required this.label,
@@ -644,6 +725,7 @@ class _GenderButton extends StatelessWidget {
   }
 }
 
+// 식사 구분 버튼
 class _MealTypeButton extends StatelessWidget {
   const _MealTypeButton({
     required this.label,

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:honey/providers/auth_provider.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_text_field.dart';
@@ -22,7 +21,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
-  bool _obscurePassword = true;
   bool _isLoading = false;
 
   @override
@@ -144,19 +142,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               BiaryTextField(
                 controller: _passwordCtrl,
                 hint: '비밀번호',
-                obscureText: _obscurePassword,
+                obscureText: true,
                 focusNode: _passwordFocus,
-                textInputAction: TextInputAction.done,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye,
-                    color: AppColors.grayCaption,
-                    size: 20
-                  ),
-                  onPressed: () {
-                    setState(() => _obscurePassword = !_obscurePassword);
-                  }
-                )
+                textInputAction: TextInputAction.done
               ),
               const SizedBox(height: 24),
               // 로그인 버튼

@@ -18,12 +18,15 @@ class SignupScreen extends ConsumerStatefulWidget {
 }
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
-  final _emailCtrl = TextEditingController();
+  final _emailPrefixCtrl = TextEditingController();
+  final _customDomainCtrl = TextEditingController();
+  String? _selectedDomain;
+
   final _passwordCtrl = TextEditingController();
   final _passwordConfirmCtrl = TextEditingController();
   final _nicknameCtrl = TextEditingController();
 
-  final _emailFocus = FocusNode();
+  final _emailPrefixFocus = FocusNode();
   final _passwordFocus = FocusNode();
   final _passwordConfirmFocus = FocusNode();
   final _nicknameFocus = FocusNode();
@@ -42,15 +45,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
+    _emailPrefixCtrl.dispose();
+    _customDomainCtrl.dispose();
     _passwordCtrl.dispose();
     _passwordConfirmCtrl.dispose();
     _nicknameCtrl.dispose();
-    _emailFocus.dispose();
+    _emailPrefixFocus.dispose();
     _passwordFocus.dispose();
     _passwordConfirmFocus.dispose();
     _nicknameFocus.dispose();
     super.dispose();
+  }
+
+  // 조합된 이메일 주소
+  String get _fullEmail {
+    final prefix = _emailPrefixCtrl.text.trim();
+    final domain = _selectedDomain == '직접 입력' ?
+      _customDomainCtrl.text.trim() : (_selectedDomain ?? '');
+    if (prefix.isEmpty || domain.isEmpty) return '';
+    return '$prefix@$domain';
   }
 
   // 유효성 검사
@@ -84,7 +97,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   bool _validateAll() {
-    final emailErr = _validateEmail(_emailCtrl.text);
+    final emailErr = _validateEmail(_fullEmail);
     final pwErr = _validatePassword(_passwordCtrl.text);
     final pwConfirmErr = _validatePasswordConfirm(_passwordConfirmCtrl.text);
     final nicknameErr = _validateNickname(_nicknameCtrl.text);
@@ -138,7 +151,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Future<void> _submit() async {
     if (!_validateAll()) {
       if (_emailError != null) {
-        _emailFocus.requestFocus();
+        _emailPrefixFocus.requestFocus();
       } else if (_passwordError != null) {
         _passwordFocus.requestFocus();
       } else if (_passwordConfirmError != null) {
@@ -157,7 +170,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authRepositoryProvider)
-        .signUp(_emailCtrl.text.trim(), _passwordCtrl.text, _nicknameCtrl.text.trim());
+        .signUp(_fullEmail, _passwordCtrl.text, _nicknameCtrl.text.trim());
       if (!mounted) return;
       await BiaryDialog.show(
         context,
@@ -206,16 +219,71 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                BiaryTextField(
-                  controller: _emailCtrl,
-                  hint: '이메일',
-                  keyboardType: TextInputType.emailAddress,
-                  focusNode: _emailFocus,
-                  textInputAction: TextInputAction.next,
-                  onSubmitted: (_) => _passwordFocus.requestFocus(),
-                  errorText: _emailError,
-                  onChanged: (_) => setState(() => _emailError = null)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: BiaryTextField(
+                        controller: _emailPrefixCtrl,
+                        hint: '아이디',
+                        keyboardType: TextInputType.emailAddress,
+                        focusNode: _emailPrefixFocus,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) => _passwordFocus.requestFocus(),
+                        errorText: _emailError,
+                        onChanged: (_) => setState(() => _emailError = null)
+                      )
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 15, left: 8, right: 6),
+                      child: const Text(
+                        '@',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.darkGray,
+                          fontWeight: FontWeight.w500
+                        )
+                      )
+                    ),
+                    Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.inputBorder)
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedDomain,
+                          hint: const Text(
+                            '이메일 선택',
+                            style: TextStyle(fontSize: 13, color: AppColors.grayCaption),
+                          ),
+                          style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+                          items: ['gmail.com', 'naver.com', '직접 입력'].map(
+                            (d) => DropdownMenuItem(value: d, child: Text(d))
+                          ).toList(),
+                          onChanged: (v) => setState(() {
+                            _selectedDomain = v!;
+                            _emailError = null;
+                          })
+                        )
+                      )
+                    )
+                  ]
                 ),
+                if (_selectedDomain == '직접 입력') ...[
+                  const SizedBox(height: 8),
+                  BiaryTextField(
+                    controller: _customDomainCtrl,
+                    hint: '이메일',
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => _passwordFocus.requestFocus(),
+                    onChanged: (_) => setState(() => _emailError = null)
+                  )
+                ],
                 const SizedBox(height: 12),
                 BiaryTextField(
                   controller: _passwordCtrl,
@@ -276,7 +344,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
                     const SizedBox(width: 8),
                     SizedBox(
-                      width: 80,
+                      width: 96,
                       child: BiaryButton(
                         label: '중복확인',
                         type: BiaryButtonType.outlined,
@@ -298,14 +366,21 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 BiaryCheckboxTile(
                   label: '개인정보처리방침 동의 (필수)',
                   value: _termsAgreed,
-                  onChanged: (v) => setState(() => _termsAgreed = v ?? false),
+                  onChanged: (v) async {
+                    if (v == true) {
+                      await _openTerms();
+                    } else {
+                      setState(() => _termsAgreed = false);
+                    }
+                  },
                   linkText: '보기',
                   onLinkTap: _openTerms
                 ),
                 const SizedBox(height: 32),
                 BiaryButton(
                   label: '가입하기',
-                  onPressed: (_nicknameChecked && _nicknameAvailable) ? _submit : null
+                  onPressed:
+                    (_nicknameChecked && _nicknameAvailable) ? _submit : null
                 ),
                 const SizedBox(height: 24)
               ]
