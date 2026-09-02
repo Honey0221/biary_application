@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:honey/presentation/widgets/biary_select_button.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/data/local/local_child_profile.dart';
@@ -320,7 +321,14 @@ class _GuestStep1 extends StatelessWidget {
           style: TextStyle(fontSize: 13, color: AppColors.textMedium)
         ),
         const SizedBox(height: 32),
-        const _FieldLabel('생년월일'),
+        const Text(
+          '생년월일',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.darkGray
+          )
+        ),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: onPickDate,
@@ -344,22 +352,33 @@ class _GuestStep1 extends StatelessWidget {
           )
         ),
         const SizedBox(height: 20),
-        const _FieldLabel('성별'),
+        const Text(
+          '성별',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.darkGray
+          )
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
-            _GenderButton(
-              label: '남아',
-              selected: gender == 'male',
-              hasError: errorText != null && gender == null,
-              onTap: () => onSelectGender('male')
+            Expanded(
+              child: BiarySelectButton(
+                label: '남아',
+                selected: gender == 'male',
+                hasError: errorText != null && gender == null,
+                onTap: () => onSelectGender('male')
+              ),
             ),
             const SizedBox(width: 12),
-            _GenderButton(
-              label: '여아',
-              selected: gender == 'female',
-              hasError: errorText != null && gender == null,
-              onTap: () => onSelectGender('female')
+            Expanded(
+              child: BiarySelectButton(
+                label: '여아',
+                selected: gender == 'female',
+                hasError: errorText != null && gender == null,
+                onTap: () => onSelectGender('female')
+              )
             )
           ]
         ),
@@ -428,7 +447,14 @@ class _GuestStep2 extends StatelessWidget {
           style: TextStyle(fontSize: 13, color: AppColors.textMedium)
         ),
         const SizedBox(height: 28),
-        const _FieldLabel('식사 구분'),
+        const Text(
+          '식사 구분',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.darkGray
+          )
+        ),
         const SizedBox(height: 8),
         Row(
           children: _mealTypes.asMap().entries.map((entry) {
@@ -438,11 +464,13 @@ class _GuestStep2 extends StatelessWidget {
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: isLast ? 0 : 8),
-                child: _MealTypeButton(
+                child: BiarySelectButton(
                   label: type,
                   selected: mealType == type,
                   hasError: errorText != null && mealType == null,
-                  onTap: () => onSelectMealType(type)
+                  onTap: () => onSelectMealType(type),
+                  verticalPadding: 10.0,
+                  borderRadius: 8.0
                 )
               )
             );
@@ -453,7 +481,14 @@ class _GuestStep2 extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const _FieldLabel('음식 목록'),
+            const Text(
+              '음식 목록',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.darkGray
+              )
+            ),
             GestureDetector(
               onTap: onAddFood,
               child: const Icon(
@@ -661,108 +696,6 @@ class _Dot extends StatelessWidget {
           )
         )
       ]
-    );
-  }
-}
-
-// 필드 라벨
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: const TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.w600,
-      color: AppColors.darkGray
-    )
-  );
-}
-
-// 성별 버튼
-class _GenderButton extends StatelessWidget {
-  const _GenderButton({
-    required this.label,
-    required this.selected,
-    required this.hasError,
-    required this.onTap
-  });
-
-  final String label;
-  final bool selected;
-  final bool hasError;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.primaryBrown : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: selected ? AppColors.primaryBrown :
-                hasError ? AppColors.error : AppColors.inputBorder
-            )
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : AppColors.textMedium
-            )
-          )
-        )
-      )
-    );
-  }
-}
-
-// 식사 구분 버튼
-class _MealTypeButton extends StatelessWidget {
-  const _MealTypeButton({
-    required this.label,
-    required this.selected,
-    required this.hasError,
-    required this.onTap
-  });
-
-  final String label;
-  final bool selected;
-  final bool hasError;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primaryBrown : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected ? AppColors.primaryBrown :
-              hasError ? AppColors.error : AppColors.inputBorder
-          )
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppColors.textMedium
-          )
-        )
-      )
     );
   }
 }
