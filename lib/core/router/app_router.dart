@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:honey/data/models/child_profile.dart';
 import 'package:honey/presentation/screens/auth/find_password_screen.dart';
 import 'package:honey/presentation/screens/auth/guest_entry_screen.dart';
 import 'package:honey/presentation/screens/auth/signup_screen.dart';
+import 'package:honey/presentation/screens/child/child_form_screen.dart';
 import 'package:honey/presentation/screens/home/guest_home_screen.dart';
 import 'package:honey/presentation/screens/home/home_screen.dart';
 import 'package:honey/presentation/screens/policy/terms_screen.dart';
@@ -126,6 +128,20 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => _fadePage(
         pageKey: state.pageKey,
         child: const GuestHomeScreen()
+      )
+    ),
+    GoRoute(
+      path: '/chile/new',
+      pageBuilder: (context, state) => _modalPage(
+        pageKey: state.pageKey,
+        child: const ChildFormScreen()
+      )
+    ),
+    GoRoute(
+      path: '/child/:id/edit',
+      pageBuilder: (context, state) => _modalPage(
+        pageKey: state.pageKey,
+        child: ChildFormScreen(initialProfile: state.extra as ChildProfile)
       )
     )
     // 개발 진행하면서 여기에 라우트 추가
