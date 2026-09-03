@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:honey/core/constants/nutrient_codes.dart';
 import 'package:honey/data/models/child_profile.dart';
+import 'package:honey/data/models/food_search_result.dart';
 import 'package:honey/data/models/meal_item.dart';
 import 'package:honey/data/models/meal_record.dart';
+import 'package:honey/data/repositories/food_api_repository.dart';
 import 'package:honey/data/repositories/meal_record_repository.dart';
 import 'package:honey/presentation/screens/meal/meal_record_form_screen.dart';
 import 'package:honey/providers/child_profile_provider.dart';
+import 'package:honey/providers/food_search_provider.dart';
 import 'package:honey/providers/meal_record_provider.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockMealRecordRepository extends Mock implements MealRecordRepository {}
+class MockFoodApiRepository extends Mock implements FoodApiRepository {}
 
 // 테스트 픽스처
 final _testChild = ChildProfile(
@@ -35,6 +40,19 @@ final _testRecord = MealRecord(
   memo: '잘 먹었어요'
 );
 
+final _testFoodResult = FoodSearchResult(
+  foodCode: 'FOOD001',
+  foodName: '흰쌀밥',
+  makerName: '테스트푸드',
+  servingSize: 210,
+  nutrients: {
+    NutrientCodes.energy: 313.0,
+    NutrientCodes.carbs: 68.1,
+    NutrientCodes.protein: 5.5,
+    NutrientCodes.fat: 0.5
+  }
+);
+
 void main() {
   late MockMealRecordRepository mockRepo;
 
@@ -50,7 +68,11 @@ void main() {
     );
   });
 
-  Widget buildApp({MealRecord? initialRecord, bool withChild = true}) {
+  Widget buildApp({
+    MealRecord? initialRecord,
+    bool withChild = true,
+    MockFoodApiRepository? mockFoodRepo
+  }) {
     final router = GoRouter(
       initialLocation: '/record/new',
       routes: [
@@ -69,7 +91,9 @@ void main() {
       overrides: [
         mealRecordRepositoryProvider.overrideWithValue(mockRepo),
         selectedChildProvider.overrideWith((ref) => withChild ? _testChild : null),
-        currentUserIdProvider.overrideWith((ref) => 'user-1')
+        currentUserIdProvider.overrideWith((ref) => 'user-1'),
+        if (mockFoodRepo != null)
+          foodApiRepositoryProvider.overrideWithValue(mockFoodRepo)
       ],
       child: MaterialApp.router(routerConfig: router)
     );
@@ -128,12 +152,12 @@ void main() {
       await tester.pumpWidget(buildApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('음식명'), findsOneWidget);
+      expect(find.text('음식명 검색 또는 직접 입력'), findsOneWidget);
 
       await tester.tap(find.text('음식 추가'));
       await tester.pump();
 
-      expect(find.text('음식명'), findsNWidgets(2));
+      expect(find.text('음식명 검색 또는 직접 입력'), findsNWidgets(2));
     });
 
     testWidgets('음식 2개 이상 시 삭제 버튼이 표시된다', (tester) async {
@@ -221,6 +245,93 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('수정'), findsOneWidget);
+    });
+  });
+
+  group('음식 검색 자동완성', () {
+    late MockFoodApiRepository mockFoodRepo;
+
+    setUp(() {
+      mockFoodRepo = MockFoodApiRepository();
+    });
+
+    testWidgets('1글자 입력 시 searchFoods가 호출되지 않는다', (tester) async {
+      await tester.pumpWidget(buildApp(mockFoodRepo: mockFoodRepo));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '밥');
+      await tester.pumpAndSettle();
+
+      verifyNever(() => mockFoodRepo.searchFoods(any()));
+    });
+
+    testWidgets('2글자 입력 시 API가 호출되고 드롭다운에 결과가 표시된다', (tester) async {
+      when(() => mockFoodRepo.searchFoods(any()))
+        .thenAnswer((_) async => [_testFoodResult]);
+
+      await tester.pumpWidget(buildApp(mockFoodRepo: mockFoodRepo));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '흰쌀');
+      await tester.pumpAndSettle();
+
+      verify(() => mockFoodRepo.searchFoods('흰쌀')).called(1);
+      expect(find.text('흰쌀밥'), findsOneWidget);
+      expect(find.text('313 kcal'), findsOneWidget);
+    });
+
+    testWidgets('드롭다운 항목 선택 시 TextField에 음식명이 반영된다', (tester) async {
+      when(() => mockFoodRepo.searchFoods(any()))
+        .thenAnswer((_) async => [_testFoodResult]);
+
+      await tester.pumpWidget(buildApp(mockFoodRepo: mockFoodRepo));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '흰쌀');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('흰쌀밥'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('흰쌀밥'), findsOneWidget);
+    });
+
+    testWidgets('API 오류 시 드롭다운이 표시되지 않는다', (tester) async {
+      when(() => mockFoodRepo.searchFoods(any()))
+        .thenThrow(Exception('API 오류'));
+
+      await tester.pumpWidget(buildApp(mockFoodRepo: mockFoodRepo));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '흰쌀');
+      await tester.pumpAndSettle();
+
+      expect(find.text('흰쌀밥'), findsNothing);
+    });
+
+    testWidgets('직접 입력(드롭다운 미선택)으로도 저장이 가능하다', (tester) async {
+      when(() => mockFoodRepo.searchFoods(any()))
+        .thenAnswer((_) async => []);
+      when(() => mockRepo.createRecord(
+        record: any(named: 'record'),
+        localPhotoPaths: any(named: 'localPhotoPaths')
+      )).thenAnswer((_) async => _testRecord);
+
+      await tester.pumpWidget(buildApp(mockFoodRepo: mockFoodRepo));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '직접입력음식');
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('저장'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('저장'));
+      await tester.pump();
+
+      verify(() => mockRepo.createRecord(
+        record: any(named: 'record'),
+        localPhotoPaths: any(named: 'localPhotoPaths')
+      )).called(1);
     });
   });
 }
