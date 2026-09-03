@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:honey/data/models/child_profile.dart';
+import 'package:honey/data/models/meal_record.dart';
 import 'package:honey/presentation/screens/auth/find_password_screen.dart';
 import 'package:honey/presentation/screens/auth/guest_entry_screen.dart';
 import 'package:honey/presentation/screens/auth/signup_screen.dart';
 import 'package:honey/presentation/screens/child/child_form_screen.dart';
 import 'package:honey/presentation/screens/home/guest_home_screen.dart';
 import 'package:honey/presentation/screens/home/home_screen.dart';
+import 'package:honey/presentation/screens/meal/meal_record_detail_screen.dart';
+import 'package:honey/presentation/screens/meal/meal_record_form_screen.dart';
 import 'package:honey/presentation/screens/policy/terms_screen.dart';
 import 'package:honey/presentation/screens/splash/splash_screen.dart';
 import 'package:honey/presentation/screens/auth/login_screen.dart';
@@ -131,7 +134,7 @@ final appRouter = GoRouter(
       )
     ),
     GoRoute(
-      path: '/chile/new',
+      path: '/child/new',
       pageBuilder: (context, state) => _modalPage(
         pageKey: state.pageKey,
         child: const ChildFormScreen()
@@ -143,7 +146,32 @@ final appRouter = GoRouter(
         pageKey: state.pageKey,
         child: ChildFormScreen(initialProfile: state.extra as ChildProfile)
       )
-    )
+    ),
+    GoRoute(
+      path: '/record/new',
+      pageBuilder: (context, state) => _modalPage(
+        pageKey: state.pageKey,
+          child: const MealRecordFormScreen()
+      )
+    ),
+    GoRoute(
+      path: '/record/:id/edit',
+      pageBuilder: (context, state) => _modalPage(
+        pageKey: state.pageKey,
+        child: MealRecordFormScreen(
+          initialRecord: state.extra as MealRecord
+        )
+      )
+    ),
+    GoRoute(
+      path: '/record/:id',
+      pageBuilder: (context, state) => _pushPage(
+        pageKey: state.pageKey,
+        child: MealRecordDetailScreen(
+          recordId: state.pathParameters['id']!
+        )
+      )
+    ),
     // 개발 진행하면서 여기에 라우트 추가
-  ],
+  ]
 );
