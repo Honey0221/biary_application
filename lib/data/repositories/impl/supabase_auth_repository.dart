@@ -50,8 +50,9 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<bool> isNicknameTaken(String nickname) async {
     final response = await _client
       .from('users')
-      .select('id')
+      .select()
       .eq('display_name', nickname)
+      .limit(1)
       .maybeSingle();
     return response != null;
   }

@@ -149,18 +149,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   
   // 회원가입 처리
   Future<void> _submit() async {
-    if (!_validateAll()) {
-      if (_emailError != null) {
-        _emailPrefixFocus.requestFocus();
-      } else if (_passwordError != null) {
-        _passwordFocus.requestFocus();
-      } else if (_passwordConfirmError != null) {
-        _passwordConfirmFocus.requestFocus();
-      } else if (_nicknameError != null) {
-        _nicknameFocus.requestFocus();
-      }
-      return;
-    }
+    if (!_validateAll()) return;
     if (!_termsAgreed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('개인정보처리방침에 동의해주세요.'))
@@ -178,7 +167,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         content: '바이어리에 오신 것을 환영해요!\n아이 프로필을 등록하시겠어요?',
         cancelLabel: '다음에',
         confirmLabel: '이동',
-        onCancel: () => context.go('/home'),
+        onCancel: () => context.go('/guest-home'),
         onConfirm: () => context.go('/child/new')
       );
     } catch (e) {
@@ -258,9 +247,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           value: _selectedDomain,
                           hint: const Text(
                             '이메일 선택',
-                            style: TextStyle(fontSize: 13, color: AppColors.grayCaption),
+                            style: TextStyle(fontSize: 15, color: AppColors.grayCaption),
                           ),
-                          style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+                          style: const TextStyle(fontSize: 15, color: AppColors.darkGray),
                           items: ['gmail.com', 'naver.com', '직접 입력'].map(
                             (d) => DropdownMenuItem(value: d, child: Text(d))
                           ).toList(),
@@ -348,8 +337,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       child: BiaryButton(
                         label: '중복확인',
                         type: BiaryButtonType.outlined,
-                        onPressed: _checkNickname,
-                        height: 52
+                        onPressed: (_nicknameChecked && _nicknameAvailable) ?
+                          null : _checkNickname,
+                        height: 55,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 6)
                       )
                     )
                   ]
@@ -372,9 +363,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     } else {
                       setState(() => _termsAgreed = false);
                     }
-                  },
-                  linkText: '보기',
-                  onLinkTap: _openTerms
+                  }
                 ),
                 const SizedBox(height: 32),
                 BiaryButton(
