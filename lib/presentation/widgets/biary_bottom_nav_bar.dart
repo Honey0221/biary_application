@@ -27,7 +27,7 @@ class BiaryBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surfaceCard,
         border: Border(top: BorderSide(color: AppColors.divider))
       ),
       child: SafeArea(

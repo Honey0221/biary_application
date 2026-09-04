@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:honey/core/constants/app_colors.dart';
+import 'package:honey/presentation/widgets/biary_button.dart';
 
 class BiaryDialog extends StatelessWidget {
   const BiaryDialog({
@@ -48,56 +49,113 @@ class BiaryDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(16)),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: AppColors.darkGray
-        )
-      ),
-      content: Text(
-        content,
-        style: const TextStyle(
-          fontSize: 14,
-          color: AppColors.textMedium,
-          height: 1.6
-        )
-      ),
-      actions: [
-        if (cancelLabel != null)
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              onCancel?.call();
-            },
-            child: Text(
-              cancelLabel!,
-              style: TextStyle(
-                color: AppColors.textMedium,
-                fontSize: 14,
-                fontWeight: FontWeight.w500
+    final hasTwoButtons = cancelLabel != null;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 320),
+        decoration: BoxDecoration(
+          color: AppColors.warmCream,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 4)
+            )
+          ]
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.darkGray,
+                      height: 1.4
+                    )
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    content,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textMedium,
+                      height: 1.7
+                    )
+                  )
+                ]
               )
+            ),
+            const Divider(height: 1, color: AppColors.divider),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: hasTwoButtons ? Row(
+                children: [
+                  Expanded(
+                    child: BiaryButton(
+                      label: cancelLabel!,
+                      type: BiaryButtonType.outlined,
+                      height: 46,
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onCancel?.call();
+                      }
+                    )
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _confirmButton(context)
+                  )
+                ]
+              ) : _confirmButton(context),
             )
-          ),
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-            onConfirm?.call();
-          },
-          child: Text(
-            confirmLabel,
-            style: TextStyle(
-              color: isDangerous ? AppColors.error : AppColors.primaryBrown,
-              fontSize: 14,
-              fontWeight: FontWeight.w600
-            )
-          )
+          ]
         )
-      ]
+      )
+    );
+  }
+
+  Widget _confirmButton(BuildContext context) {
+    return isDangerous ? ElevatedButton(
+      onPressed: () {
+        Navigator.of(context).pop();
+        onConfirm?.call();
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.error,
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(46),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)
+        ),
+        elevation: 0
+      ),
+      child: Text(
+        confirmLabel,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600
+        )
+      )
+    ) : BiaryButton(
+      label: confirmLabel,
+      height: 46,
+      onPressed: () {
+        Navigator.of(context).pop();
+        onConfirm?.call();
+      }
     );
   }
 }

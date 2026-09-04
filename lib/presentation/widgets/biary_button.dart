@@ -14,6 +14,7 @@ class BiaryButton extends StatelessWidget {
     this.isLoading = false,
     this.width = double.infinity,
     this.height = 52,
+    this.contentPadding,
     this.icon
   });
 
@@ -23,6 +24,7 @@ class BiaryButton extends StatelessWidget {
   final bool isLoading;
   final double? width;
   final double? height;
+  final EdgeInsetsGeometry? contentPadding;
   final Widget? icon;
 
   @override
@@ -65,7 +67,8 @@ class BiaryButton extends StatelessWidget {
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12)
-            )
+            ),
+            padding: contentPadding
           ),
           child: _buildChild()
         );
@@ -92,10 +95,12 @@ class BiaryButton extends StatelessWidget {
 
     final textWidget = Text(
       label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: const TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w500,
-        letterSpacing: 0.5
+        letterSpacing: 0.3
       )
     );
 
