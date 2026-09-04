@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:honey/presentation/widgets/biary_select_button.dart';
@@ -8,6 +9,9 @@ import 'package:honey/data/local/local_child_profile.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_dialog.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../data/models/food_search_result.dart';
+import '../../widgets/food_search_field.dart';
 
 class GuestEntryScreen extends StatefulWidget {
   const GuestEntryScreen({super.key});
@@ -28,20 +32,16 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
   // step 2
   String? _mealType;
   String? _step2Error;
-  final _foodControllers = <TextEditingController>[TextEditingController()];
-  final _foodFocusNodes = <FocusNode>[FocusNode()];
+  final _foodEntries = <_GuestFoodEntry>[_GuestFoodEntry()];
 
   bool get _hasAnyInput =>
     _birthDate != null || _gender != null || _mealType != null ||
-    _foodControllers.any((c) => c.text.trim().isNotEmpty);
+      _foodEntries.any((e) => e.nameCtrl.text.trim().isNotEmpty);
 
   @override
   void dispose() {
-    for (final c in _foodControllers) {
-      c.dispose();
-    }
-    for (final f in _foodFocusNodes) {
-      f.dispose();
+    for (final e in _foodEntries) {
+      e.dispose();
     }
     super.dispose();
   }
@@ -68,20 +68,17 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
   // 음식 필드 추가
   void _addFoodField() {
     setState(() {
-      _foodControllers.add(TextEditingController());
-      _foodFocusNodes.add(FocusNode());
+      _foodEntries.add(_GuestFoodEntry());
       _step2Error = null;
     });
   }
 
   // 음식 필드 삭제
   void _removeFoodField(int index) {
-    if (_foodControllers.length <= 1) return;
+    if (_foodEntries.length <= 1) return;
     setState(() {
-      _foodControllers[index].dispose();
-      _foodFocusNodes[index].dispose();
-      _foodControllers.removeAt(index);
-      _foodFocusNodes.removeAt(index);
+      _foodEntries[index].dispose();
+      _foodEntries.removeAt(index);
     });
   }
 
@@ -94,7 +91,7 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
     final step2Errors = <String>[];
     if (_mealType == null) step2Errors.add('식사 구분');
 
-    final hasAnyFood = _foodControllers.any((c) => c.text.trim().isNotEmpty);
+    final hasAnyFood = _foodEntries.any((e) => e.nameCtrl.text.trim().isNotEmpty);
     if (!hasAnyFood) step2Errors.add('음식 목록');
 
     final allErrors = [...step1Errors, ...step2Errors];
@@ -120,9 +117,6 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
       if (step1Errors.isNotEmpty) {
         if (_step == 2) setState(() { _step = 1; _goingForward = false; });
         return;
-      }
-      if (step2Errors.contains('음식 목록')) {
-        _foodFocusNodes.first.requestFocus();
       }
       return;
     }
@@ -257,9 +251,8 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
                     ) : _GuestStep2(
                       key: const ValueKey(2),
                       mealType: _mealType, 
-                      foodControllers: _foodControllers,
-                      foodFocusNodes: _foodFocusNodes,
-                      errorText: _step2Error, 
+                      foodEntries: _foodEntries,
+                      errorText: _step2Error,
                       onSelectMealType: (m) => setState(() {
                         _mealType = m;
                         _step2Error = null;
@@ -279,6 +272,16 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
       )
     );
   }
+}
+
+class _GuestFoodEntry {
+  FoodSearchResult? selectedFood;
+  final TextEditingController nameCtrl;
+
+  _GuestFoodEntry({String name = ''})
+    : nameCtrl = TextEditingController(text: name);
+
+  void dispose() => nameCtrl.dispose();
 }
 
 // Step 1
@@ -400,12 +403,11 @@ class _GuestStep1 extends StatelessWidget {
 }
 
 // Step 2
-class _GuestStep2 extends StatelessWidget {
+class _GuestStep2 extends ConsumerWidget {
   const _GuestStep2({
     super.key,
     required this.mealType,
-    required this.foodControllers,
-    required this.foodFocusNodes,
+    required this.foodEntries,
     required this.errorText,
     required this.onSelectMealType,
     required this.onFoodChanged,
@@ -416,8 +418,7 @@ class _GuestStep2 extends StatelessWidget {
   });
 
   final String? mealType;
-  final List<TextEditingController> foodControllers;
-  final List<FocusNode> foodFocusNodes;
+  final List<_GuestFoodEntry> foodEntries;
   final String? errorText;
   final void Function(String) onSelectMealType;
   final VoidCallback onFoodChanged;
@@ -429,7 +430,7 @@ class _GuestStep2 extends StatelessWidget {
   static const _mealTypes = ['아침', '점심', '저녁', '간식'];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -443,7 +444,7 @@ class _GuestStep2 extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text(
-          '음식을 입력하면 영양소를 분석해드려요.',
+          '음식을 검색하면 영양소를 분석해드려요.',
           style: TextStyle(fontSize: 13, color: AppColors.textMedium)
         ),
         const SizedBox(height: 28),
@@ -505,11 +506,10 @@ class _GuestStep2 extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ...foodControllers.asMap().entries.map((entry) {
+                ...foodEntries.asMap().entries.map((entry) {
                   final idx = entry.key;
-                  final controller = entry.value;
-                  final focusNode = foodFocusNodes[idx];
-                  final isEmpty = controller.text.trim().isEmpty;
+                  final foodEntry = entry.value;
+                  final isEmpty = foodEntry.nameCtrl.text.trim().isEmpty;
                   final showError = errorText != null && isEmpty;
 
                   return Padding(
@@ -518,54 +518,24 @@ class _GuestStep2 extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
-                          child: TextField(
-                            controller: controller,
-                            focusNode: focusNode,
-                            onChanged: (_) => onFoodChanged(),
-                            textInputAction: TextInputAction.next,
-                            onSubmitted: (_) => onAddFood(),
-                            decoration: InputDecoration(
-                              hintText: '음식 이름 (예: 쌀죽)',
-                              hintStyle: const TextStyle(
-                                color: AppColors.grayCaption,
-                                fontSize: 13
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: showError ?
-                                    AppColors.error : AppColors.inputBorder
-                                )
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: showError ?
-                                    AppColors.error : AppColors.inputBorder
-                                )
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(
-                                  color: AppColors.primaryBrown
-                                )
-                              )
-                            )
+                          child: FoodSearchField(
+                            controller: foodEntry.nameCtrl,
+                            selectedFood: foodEntry.selectedFood,
+                            hintText: '음식명 검색 (예: 쌀죽)',
+                            hasError: showError,
+                            onSelected: (result) {
+                              foodEntry.selectedFood = result;
+                              onFoodChanged();
+                            },
+                            onChanged: onFoodChanged,
                           )
                         ),
-                        if (foodControllers.length > 1) ...[
+                        if (foodEntries.length > 1) ...[
                           const SizedBox(width: 6),
                           GestureDetector(
                             onTap: () => onRemoveFood(idx),
                             child: Container(
-                              width: 32,
-                              height: 32,
+                              width: 32, height: 32,
                               decoration: BoxDecoration(
                                 color: AppColors.surfaceMuted,
                                 borderRadius: BorderRadius.circular(6)
@@ -597,6 +567,11 @@ class _GuestStep2 extends StatelessWidget {
               ]
             )
           )
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '검색으로 선택한 음식만 영양소 분석에 포함됩니다',
+          style: TextStyle(fontSize: 11, color: AppColors.grayCaption),
         ),
         const SizedBox(height: 8),
         Row(

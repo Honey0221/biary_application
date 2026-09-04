@@ -14,12 +14,12 @@ import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_dialog.dart';
 import 'package:honey/presentation/widgets/biary_select_button.dart';
 import 'package:honey/presentation/widgets/biary_text_field.dart';
+import 'package:honey/presentation/widgets/food_search_field.dart';
 import 'package:honey/presentation/widgets/loading_overlay.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../providers/child_profile_provider.dart';
 import '../../../providers/meal_record_provider.dart';
-import '../../../providers/food_search_provider.dart';
 
 // 음식 항목 로컬 상태 클래스
 class _FoodEntry {
@@ -344,13 +344,13 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _FoodItemCard(
-                    entry: _foodEntries[i],
+                    foodEntry: _foodEntries[i],
                     canDelete: _foodEntries.length > 1,
                     onRemove: () => setState(() {
                       _foodEntries[i].dispose();
                       _foodEntries.removeAt(i);
                     }),
-                    onChanged: () => setState(() => _foodListError = null),
+                    onFoodChanged: () => setState(() => _foodListError = null),
                     onReactionChanged: (r) =>
                       setState(() => _foodEntries[i].reactionType = r)
                   )
@@ -522,17 +522,17 @@ class _DatePicker extends StatelessWidget {
 
 // 음식 항목 카드
 class _FoodItemCard extends ConsumerWidget {
-  final _FoodEntry entry;
+  final _FoodEntry foodEntry;
   final bool canDelete;
   final VoidCallback onRemove;
-  final VoidCallback onChanged;
+  final VoidCallback onFoodChanged;
   final ValueChanged<String?> onReactionChanged;
 
   const _FoodItemCard({
-    required this.entry,
+    required this.foodEntry,
     required this.canDelete,
     required this.onRemove,
-    required this.onChanged,
+    required this.onFoodChanged,
     required this.onReactionChanged
   });
 
@@ -552,52 +552,23 @@ class _FoodItemCard extends ConsumerWidget {
             children: [
               Expanded(
                 flex: 3,
-                child: Autocomplete<FoodSearchResult>(
-                  initialValue: TextEditingValue(text: entry.nameCtrl.text),
-                  optionsBuilder: (textVal) async {
-                    final q = textVal.text.trim();
-                    if (q.length < 2) return const [];
-                    try {
-                      return await ref.read(foodApiRepositoryProvider).searchFoods(q);
-                    } catch (_) {
-                      return const [];
-                    }
-                  },
-                  displayStringForOption: (r) => r.foodName,
+                child: FoodSearchField(
+                  controller: foodEntry.nameCtrl,
+                  selectedFood: foodEntry.selectedFood,
+                  hintText: '음식명 검색 또는 직접 입력',
                   onSelected: (result) {
-                    entry.nameCtrl.text = result.foodName;
-                    entry.selectedFood = result;
-                    onChanged();
+                    foodEntry.nameCtrl.text = result.foodName;
+                    foodEntry.selectedFood = result;
+                    onFoodChanged();
                   },
-                  fieldViewBuilder: (ctx, autoCtrl, focusNode, _) {
-                    return TextField(
-                      controller: autoCtrl,
-                      focusNode: focusNode,
-                      onChanged: (val) {
-                        entry.nameCtrl.text = val;
-                        if (val.isEmpty) entry.selectedFood = null;
-                        onChanged();
-                      },
-                      decoration: const InputDecoration(
-                        hintText: '음식명 검색 또는 직접 입력',
-                        hintStyle: TextStyle(color: AppColors.grayCaption),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        isDense: true
-                      ),
-                      style: const TextStyle(fontSize: 15)
-                    );
-                  },
-                  optionsViewBuilder: (ctx, onSelected, options) =>
-                    _FoodSearchDropdown(options: options, onSelected: onSelected
-                  ),
+                  onChanged: onFoodChanged,
                 )
               ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 2,
                 child: TextField(
-                  controller: entry.amountCtrl,
+                  controller: foodEntry.amountCtrl,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     hintText: '섭취량(g)',
@@ -650,7 +621,7 @@ class _FoodItemCard extends ConsumerWidget {
     };
 
     return types.map((type) {
-      final selected = entry.reactionType == type;
+      final selected = foodEntry.reactionType == type;
       return Padding(
         padding: const EdgeInsets.only(right: 6),
         child: GestureDetector(
@@ -685,11 +656,11 @@ class _FoodItemCard extends ConsumerWidget {
 
 // 사진 썸네일
 class _PhotoThumbnail extends StatelessWidget {
-  final Widget _image;
+  final Widget image;
   final VoidCallback onRemove;
 
   const _PhotoThumbnail._({
-    required this._image, required this.onRemove
+    required this.image, required this.onRemove
   });
 
   factory _PhotoThumbnail.local({
@@ -716,7 +687,7 @@ class _PhotoThumbnail extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: _image
+          child: image
         ),
         Positioned(
           top: 2, right: 2,
@@ -733,59 +704,6 @@ class _PhotoThumbnail extends StatelessWidget {
           )
         )
       ]
-    );
-  }
-}
-
-// 음식 검색 자동완성 드롭다운
-class _FoodSearchDropdown extends StatelessWidget {
-  final Iterable<FoodSearchResult> options;
-  final void Function(FoodSearchResult) onSelected;
-
-  const _FoodSearchDropdown({
-    required this.options,
-    required this.onSelected
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: Material(
-        elevation: 4,
-        borderRadius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 200),
-          child: ListView.separated(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            itemCount: options.length,
-            separatorBuilder: (_, _) =>
-              const Divider(height: 1, color: AppColors.divider
-            ),
-            itemBuilder: (_, i) {
-              final item = options.elementAt(i);
-              return ListTile(
-                dense: true,
-                title: Text(
-                  item.foodName,
-                  style: const TextStyle(fontSize: 14)
-                ),
-                subtitle: item.makerName != null ? Text(
-                  item.makerName!, style: const TextStyle(fontSize: 12)
-                ) : null,
-                trailing: item.calories != null ? Text(
-                  '${item.calories!.toStringAsFixed(0)} kcal',
-                  style: const TextStyle(
-                    fontSize: 11, color: AppColors.grayCaption
-                  )
-                ) : null,
-                onTap: () => onSelected(item)
-              );
-            }
-          )
-        )
-      )
     );
   }
 }
