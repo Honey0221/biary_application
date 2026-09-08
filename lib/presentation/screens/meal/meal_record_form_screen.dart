@@ -16,6 +16,7 @@ import 'package:honey/presentation/widgets/biary_select_button.dart';
 import 'package:honey/presentation/widgets/biary_text_field.dart';
 import 'package:honey/presentation/widgets/food_search_field.dart';
 import 'package:honey/presentation/widgets/loading_overlay.dart';
+import 'package:honey/providers/ui_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../providers/child_profile_provider.dart';
@@ -71,6 +72,10 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(tabBarVisibleProvider.notifier).state = false;
+    });
+
     if (_isEditMode) {
       final r = widget.initialRecord!;
       _selectedDate = r.mealDate;
@@ -98,6 +103,7 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
       e.dispose();
     }
     _memoCtrl.dispose();
+    ref.read(tabBarVisibleProvider.notifier).state = true;
     super.dispose();
   }
 

@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/presentation/widgets/biary_dialog.dart';
 import 'package:honey/presentation/widgets/empty_state_view.dart';
+import 'package:honey/providers/ui_provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class GuestHomeScreen extends StatefulWidget {
+class GuestHomeScreen extends ConsumerStatefulWidget {
   const GuestHomeScreen({super.key});
 
   @override
-  State<GuestHomeScreen> createState() => _GuestHomeScreenState();
+  ConsumerState<GuestHomeScreen> createState() => _GuestHomeScreenState();
 }
 
-class _GuestHomeScreenState extends State<GuestHomeScreen> {
+class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen> {
   int _selectedIndex = 0;
-
 
   @override
   void initState() {
@@ -57,13 +58,11 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
 
   // 탭 인덱스별 이벤트 함수
   void _onTabTapped(int index) {
-    if (index == 2) context.go('/guest-entry'); // FAB -> 게스트 기록 화면 이동
     if (index == 1 || index == 4) { // 기록, 마이페이지 -> 제한 다이얼로그
       _showRestrictedDialog();
       return;
     }
     if (index == 3) {
-      // TODO: 커뮤니티 화면 이동 구현 예정
       // context.push('/community');
       return;
     }
@@ -73,6 +72,8 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isTabBarVisible = ref.watch(tabBarVisibleProvider);
+
     return Scaffold(
       backgroundColor: AppColors.warmCream,
       appBar: AppBar(
@@ -108,7 +109,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
         message: '첫 식단을 기록해보세요!'
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/guest-entry'),
+        onPressed: () => context.go('/guest-entry'),
         backgroundColor: AppColors.primaryBrown,
         elevation: 2,
         child: const Icon(LucideIcons.plus, color: Colors.white)
@@ -117,37 +118,43 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          BottomAppBar(
-            color: Colors.white,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: LucideIcons.house,
-                  label: '홈',
-                  selected: _selectedIndex == 0,
-                  onTap: () => _onTabTapped(0)
-                ),
-                _NavItem(
-                  icon: LucideIcons.clipboardList,
-                  label: '기록',
-                  selected: _selectedIndex == 1,
-                  onTap: () => _onTabTapped(1)
-                ),
-                const SizedBox(width: 56),
-                _NavItem(
-                  icon: LucideIcons.users,
-                  label: '커뮤니티',
-                  selected: _selectedIndex == 3,
-                  onTap: () => _onTabTapped(3)
-                ),
-                _NavItem(
-                  icon: LucideIcons.user,
-                  label: 'MY',
-                  selected: _selectedIndex == 4,
-                  onTap: () => _onTabTapped(4)
-                )
-              ]
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: isTabBarVisible ? kBottomNavigationBarHeight : 0,
+            clipBehavior: Clip.hardEdge,
+            decoration: const BoxDecoration(),
+            child: BottomAppBar(
+              color: Colors.white,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _NavItem(
+                    icon: LucideIcons.house,
+                    label: '홈',
+                    selected: _selectedIndex == 0,
+                    onTap: () => _onTabTapped(0)
+                  ),
+                  _NavItem(
+                    icon: LucideIcons.clipboardList,
+                    label: '기록',
+                    selected: _selectedIndex == 1,
+                    onTap: () => _onTabTapped(1)
+                  ),
+                  const SizedBox(width: 56),
+                  _NavItem(
+                    icon: LucideIcons.users,
+                    label: '커뮤니티',
+                    selected: _selectedIndex == 3,
+                    onTap: () => _onTabTapped(3)
+                  ),
+                  _NavItem(
+                    icon: LucideIcons.user,
+                    label: 'MY',
+                    selected: _selectedIndex == 4,
+                    onTap: () => _onTabTapped(4)
+                  )
+                ]
+              )
             )
           )
           // TODO Phase 11: 광고 배너 구현 예정(미구독 전용)
