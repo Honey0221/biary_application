@@ -41,6 +41,16 @@ class _FindPasswordScreenState extends ConsumerState<FindPasswordScreen> {
   int _remainSeconds = 300; // 5분
 
   @override
+  void initState() {
+    super.initState();
+    _emailCtrl.clear();
+    _otpCtrl.clear();
+    _newPasswordCtrl.clear();
+    _newPasswordConfirmCtrl.clear();
+    _step = _Step.email;
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     _emailCtrl.dispose();
@@ -85,6 +95,14 @@ class _FindPasswordScreenState extends ConsumerState<FindPasswordScreen> {
     }
     setState(() { _isLoading = true; _emailError = null; });
     try {
+      final exists = await ref.read(authRepositoryProvider)
+        .isEmailExists(_emailCtrl.text.trim());
+      if (!exists && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('가입되지 않은 이메일입니다.'))
+        );
+        return;
+      }
       await ref.read(authRepositoryProvider).sendOtp(_emailCtrl.text.trim());
       if (!mounted) return;
       _startTimer();
@@ -188,7 +206,7 @@ class _FindPasswordScreenState extends ConsumerState<FindPasswordScreen> {
           elevation: 0,
           leading: IconButton(
             icon: const Icon(LucideIcons.arrowLeft, color: AppColors.darkGray),
-            onPressed: () => context.pop()
+            onPressed: () => context.go('/login')
           ),
           title: const Text(
             '비밀번호 찾기',

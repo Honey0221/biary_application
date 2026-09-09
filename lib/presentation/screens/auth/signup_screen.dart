@@ -44,6 +44,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _emailPrefixCtrl.clear();
+    _customDomainCtrl.clear();
+    _passwordCtrl.clear();
+    _passwordConfirmCtrl.clear();
+    _nicknameCtrl.clear();
+  }
+
+  @override
   void dispose() {
     _emailPrefixCtrl.dispose();
     _customDomainCtrl.dispose();

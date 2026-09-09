@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:honey/providers/auth_provider.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
@@ -21,7 +22,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
+  bool _autoLogin = false;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailCtrl.clear();
+    _passwordCtrl.clear();
+    _autoLogin = Hive.box('settingsBox')
+      .get('autoLoginEnabled', defaultValue: false) as bool;
+  }
 
   @override
   void dispose() {
@@ -56,6 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authRepositoryProvider).signInWithEmail(email, password);
+      await Hive.box('settingsBox').put('autoLoginEnabled', _autoLogin);
       if (!mounted) return;
       context.go('/home');
     } on AuthException catch (e) {
@@ -78,6 +90,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
+      await Hive.box('settingsBox').put('autoLoginEnabled', _autoLogin);
       if (!mounted) return;
       context.go('/home');
     } on AuthException catch (e) {
@@ -146,7 +159,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 focusNode: _passwordFocus,
                 textInputAction: TextInputAction.done
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              // 자동 로그인 체크 박스
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Checkbox(
+                    value: _autoLogin,
+                    onChanged: (v) => setState(() => _autoLogin = v ?? false),
+                    activeColor: AppColors.primaryBrown,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap
+                  ),
+                  const Text(
+                    '자동 로그인',
+                    style: TextStyle(fontSize: 14, color: AppColors.textMedium)
+                  )
+                ]
+              ),
+              const SizedBox(height: 8),
               // 로그인 버튼
               BiaryButton(
                 label: '로그인',
@@ -160,7 +190,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onTap: () => context.push('/find-password')
                 )
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 14),
               // 회원가입 버튼
               BiaryButton(
                 label: '회원가입',
@@ -205,6 +235,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               // 게스트로 입장하기
               Center(
                 child: BiaryTextLink(
+                  fontSize: 15,
                   label: '게스트로 입장하기',
                   onTap: () => context.push('/guest-entry'),
                   underline: true

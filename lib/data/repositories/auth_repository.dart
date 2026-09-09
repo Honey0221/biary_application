@@ -8,6 +8,9 @@ abstract class AuthRepository {
   // 회원가입
   Future<void> signUp(String email, String password, String nickname);
 
+  // 이메일 존재 확인
+  Future<bool> isEmailExists(String email);
+
   // 닉네임 중복 확인
   Future<bool> isNicknameTaken(String nickname);
 

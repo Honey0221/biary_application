@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/core/utils/version_checker.dart';
 import 'package:honey/main.dart';
@@ -50,10 +51,14 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     final session = supabase.auth.currentSession;
-    if (session != null) {
+    final autoLogin = Hive.box('settingsBox')
+      .get('autoLoginEnabled', defaultValue: false) as bool;
+
+    if (session != null && autoLogin) {
       context.go('/home');
     } else {
-      context.go('/login');
+      if (session != null) await supabase.auth.signOut();
+      if (mounted) context.go('/login');
     }
   }
 

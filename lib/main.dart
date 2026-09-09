@@ -28,8 +28,10 @@ Future<void> main() async {
   Hive.registerAdapter(LocalChildProfileAdapter());
 
   // Hive 박스 열기
+  await Hive.openBox('settingsBox');
   await Hive.openBox<GuestSession>('guest_session');
   await Hive.openBox<LocalChildProfile>('local_child_profiles');
+  await Hive.openBox<int>('guestAnalysisBox');
 
   runApp(
     const ProviderScope(

@@ -47,6 +47,16 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<bool> isEmailExists(String email) async {
+    final response = await _client
+      .from('users')
+      .select()
+      .eq('email', email)
+      .maybeSingle();
+    return response != null;
+  }
+
+  @override
   Future<bool> isNicknameTaken(String nickname) async {
     final response = await _client
       .from('users')
@@ -59,7 +69,7 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> sendOtp(String email) async {
-    await _client.auth.signInWithOtp(email: email);
+    await _client.auth.resetPasswordForEmail(email);
   }
 
   @override

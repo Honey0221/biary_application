@@ -140,7 +140,7 @@ class _GuestEntryScreenState extends State<GuestEntryScreen> {
 
     if (!mounted) return;
     context.go('/guest-home'); // Phase 5 완료 후 /guest-result로 교체할 때 아래 extra 사용
-    // context.go('/home', extra: {
+    // context.go('/guest-result', extra: {
     //   'isGuest': true,
     //   'mealType': _mealType,
     //   'foods': _foodControllers
