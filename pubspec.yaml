@@ -80,6 +80,7 @@ dependencies:
   # HTTP 클라이언트
   http: ^1.2.2
 
+  hive: any
 dev_dependencies:
   # 테스트
   flutter_test:

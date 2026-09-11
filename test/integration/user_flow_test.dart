@@ -206,8 +206,12 @@ void main() {
         FoodIntakeEntry(food: _riceFood!, intakeAmountG: 210)
       ];
 
-      final res = await AnalysisService.analyzeBasic(
-        entries: entries, childId: _childId!, childAgeMonths: 48, childGender: 'm'
+      final res = await AnalysisService.analyze(
+        isSubscriber: false,
+        entries: entries,
+        childId: _childId!,
+        childAgeMonths: 48,
+        childGender: 'm'
       );
 
       print('\n[STEP 5] 영양 분석 결과');
