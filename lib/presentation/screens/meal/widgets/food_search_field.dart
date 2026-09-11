@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:honey/data/models/food_search_result.dart';
 import 'package:honey/providers/food_search_provider.dart';
 
-import '../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_colors.dart';
 
 class FoodSearchField extends ConsumerWidget {
   final TextEditingController controller;
