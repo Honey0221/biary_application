@@ -14,6 +14,9 @@ import 'package:honey/presentation/screens/policy/terms_screen.dart';
 import 'package:honey/presentation/screens/splash/splash_screen.dart';
 import 'package:honey/presentation/screens/auth/login_screen.dart';
 
+import '../../data/models/analysis_result.dart';
+import '../../presentation/screens/analysis/analysis_result_screen.dart';
+
 // 페이드 전환 헬퍼 함수(루트 / 탭 전환)
 CustomTransitionPage<void> _fadePage({
   required LocalKey pageKey,
@@ -171,6 +174,21 @@ final appRouter = GoRouter(
           recordId: state.pathParameters['id']!
         )
       )
+    ),
+    GoRoute(
+      path: '/analysis/result',
+      pageBuilder: (context, state) {
+        final args = state.extra as Map<String, dynamic>;
+        return _pushPage(
+          pageKey: state.pageKey,
+          child: AnalysisResultScreen(
+            result: args['result'] as AnalysisResult,
+            childName: args['childName'] as String,
+            isGuest: args['isGuest'] as bool,
+            isModified: args['isModified'] as bool? ?? false,
+          ),
+        );
+      }
     ),
     // 개발 진행하면서 여기에 라우트 추가
   ]

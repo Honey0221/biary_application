@@ -102,6 +102,18 @@ class NutrientCalculator {
     return                   NutrientStatus.excess;
   }
 
+  // 바 표시용 달성률 대략 계산
+  static double rateFromStatus(String? status) {
+    return switch (status) {
+      'deficient' => 35.0,
+      'slightlyLow' => 60.0,
+      'adequate' => 90.0,
+      'slightlyHigh' => 130.0,
+      'excess' => 160.0,
+      _ => 0.0
+    };
+  }
+
   // 전체 상태 요약 맵 생성 (Supabase JSONB 저장용)
   static Map<String, String> buildStatusSummary(Map<String, double> achievement) {
     return achievement.map(
