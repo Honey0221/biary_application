@@ -7,6 +7,8 @@ import 'package:honey/main.dart';
 import 'package:honey/presentation/widgets/biary_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/app_fonts.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -96,6 +98,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   style: TextStyle(
                     color: AppColors.darkGray,
                     fontSize: 15,
+                    fontFamily: AppFonts.batang,
                     fontWeight: FontWeight.w400,
                     letterSpacing: 0.8,
                     height: 1.6

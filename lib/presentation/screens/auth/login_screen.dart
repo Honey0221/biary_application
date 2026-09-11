@@ -9,6 +9,8 @@ import 'package:honey/presentation/widgets/biary_text_field.dart';
 import 'package:honey/presentation/widgets/biary_text_link.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/constants/app_fonts.dart';
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -134,6 +136,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 style: TextStyle(
                   color: AppColors.darkGray,
                   fontSize: 17,
+                  fontFamily: AppFonts.batang,
                   fontWeight: FontWeight.w300,
                   height: 1.8,
                   letterSpacing: 0.3

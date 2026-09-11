@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_fonts.dart';
 
 class AiCommentCard extends StatelessWidget {
   const AiCommentCard({super.key, required this.comment});
@@ -20,6 +21,7 @@ class AiCommentCard extends StatelessWidget {
         comment,
         style: const TextStyle(
           fontSize: 13,
+          fontFamily: AppFonts.dodum,
           color: AppColors.darkGray,
           height: 1.6
         )

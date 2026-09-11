@@ -4,6 +4,8 @@ import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/constants/app_fonts.dart';
+
 class TermsScreen extends StatefulWidget {
   // readOnly: true → 마이페이지 진입 (동의 버튼 없음)
   // readOnly: false → 회원가입 진입 (스크롤 끝까지 → 동의 버튼 활성화)
@@ -243,6 +245,7 @@ class _PolicyHeader extends StatelessWidget {
           '이와 관련한 고충을 신속하고 원활하게 처리할 수 있도록 다음과 같이 개인정보처리방침을 수립·공개합니다.',
           style: TextStyle(
             fontSize: 13,
+            fontFamily: AppFonts.dodum,
             color: AppColors.grayCaption,
             height: 1.6
           )
@@ -283,6 +286,7 @@ class _PolicyArticle extends StatelessWidget {
             content,
             style: const TextStyle(
               fontSize: 13,
+              fontFamily: AppFonts.dodum,
               color: AppColors.darkGray,
               height: 1.7
             )
