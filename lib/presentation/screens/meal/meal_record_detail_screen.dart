@@ -2,15 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:honey/core/constants/app_colors.dart';
+import 'package:honey/core/utils/age_calculator.dart';
 import 'package:honey/core/utils/date_formatter.dart';
+import 'package:honey/data/services/analysis_service.dart';
+import 'package:honey/presentation/screens/meal/widgets/food_item_tile.dart';
+import 'package:honey/presentation/screens/meal/widgets/meal_header_card.dart';
+import 'package:honey/presentation/screens/meal/widgets/photo_row.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_dialog.dart';
+import 'package:honey/providers/analysis_provider.dart';
+import 'package:honey/providers/child_profile_provider.dart';
 import 'package:honey/providers/meal_record_provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../data/models/meal_item.dart';
+import '../../../core/utils/analysis_flow_helper.dart';
 import '../../../data/models/meal_record.dart';
-import '../../../data/models/meal_record_photo.dart';
+import '../analysis/widgets/analysis_loading_overlay.dart';
 
 class MealRecordDetailScreen extends ConsumerWidget {
   final String recordId;
@@ -102,6 +109,68 @@ class _DetailBody extends ConsumerWidget {
     );
   }
 
+  Future<void> _onAnalysis(BuildContext context, WidgetRef ref) async {
+    final child = ref.read(selectedChildProvider);
+    if (child == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('아이 프로필을 먼저 등록해주세요')),
+      );
+      return;
+    }
+
+    final analysisRepo = ref.read(analysisRepositoryProvider);
+    final cached = await analysisRepo.getAnalysis(record.id!);
+
+    if (!context.mounted) return;
+
+    if (!AnalysisFlowHelper.needsNewAnalysis(cached, record.updatedAt)) {
+      // 캐시 HIT → 바로 이동
+      context.go('/analysis/result', extra: {
+        'result': cached!,
+        'childName': child.name,
+        'isGuest': false,
+        'isModified': false,
+      });
+      return;
+    }
+
+    // 캐시 MISS → 오버레이 + Edge Function
+    const isSubscriber = false; // TODO: 구독 여부 provider 연결
+
+    final response = await AnalysisLoadingOverlay.show<AnalysisResponse>(
+      context, ref,
+      childName: child.name,
+      taskBuilder: (onProgress) => AnalysisService.analyze(
+        isSubscriber: isSubscriber,
+        items: record.items,
+        childId: child.id,
+        childAgeMonths: AgeCalculator.toMonths(child.birthDate),
+        childGender: child.gender,
+        onProgress: onProgress
+      )
+    );
+
+    if (response == null || !context.mounted) return;
+
+    final analysisResult = await AnalysisFlowHelper.buildAndSave(
+      response: response,
+      mealRecordId: record.id!,
+      childId: child.id,
+      targetDate: record.mealDate,
+      mealType: record.mealType,
+      repo: analysisRepo
+    );
+
+    if (context.mounted) {
+      context.go('/analysis/result', extra: {
+        'result': analysisResult,
+        'childName': child.name,
+        'isGuest': false,
+        'isModified': false,
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
@@ -143,7 +212,7 @@ class _DetailBody extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. 날짜 + 식사 구분 헤더 카드
-            _HeaderCard(
+            MealHeaderCard(
               date: DateFormatter.toDateLabel(record.mealDate),
               mealType: _mealTypeLabel
             ),
@@ -168,7 +237,7 @@ class _DetailBody extends ConsumerWidget {
                   )
                 )
               )
-            else ...record.items.map((item) => _FoodItemTile(item: item)),
+            else ...record.items.map((item) => FoodItemTile(item: item)),
 
             // 3. 사진 (있을 때만)
             if (record.photos.isNotEmpty) ...[
@@ -181,7 +250,7 @@ class _DetailBody extends ConsumerWidget {
                 )
               ),
               const SizedBox(height: 10),
-              _PhotoRow(photos: record.photos)
+              PhotoRow(photos: record.photos)
             ],
 
             // 4. 메모 (있을 때만)
@@ -218,194 +287,11 @@ class _DetailBody extends ConsumerWidget {
 
             // 5. 영양 분석 버튼
             BiaryButton(
-              label: '영양 분석 시작',
-              onPressed: () {
-                // TODO: Phase 5 구현 예정
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('구현 예정 기능입니다'))
-                );
-              }
+              label: '영양 분석하기',
+              onPressed: () => _onAnalysis(context, ref),
             )
           ]
         )
-      )
-    );
-  }
-}
-
-// 헤더 카드
-class _HeaderCard extends StatelessWidget {
-  final String date;
-  final String mealType;
-
-  const _HeaderCard({required this.date, required this.mealType});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider)
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              date,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.darkGray
-              )
-            )
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.primaryBrown,
-              borderRadius: BorderRadius.circular(20)
-            ),
-            child: Text(
-              mealType,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.white
-              )
-            )
-          )
-        ]
-      )
-    );
-  }
-}
-
-// 음식 항목 타일
-class _FoodItemTile extends StatelessWidget {
-  final MealItem item;
-
-  const _FoodItemTile({required this.item});
-
-  static const _reactionIcons = {
-    'good': LucideIcons.smile,
-    'normal': LucideIcons.meh,
-    'bad': LucideIcons.frown
-  };
-  static const _reactionLabels = {
-    'good': '좋아요', 'normal': '보통', 'bad': '거부'
-  };
-  static const _reactionColors = {
-    'good': AppColors.success,
-    'normal': AppColors.primaryLight,
-    'bad': AppColors.error
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final reaction = item.reactionType;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.divider),
-        borderRadius: BorderRadius.circular(10)
-      ),
-      child: Row(
-        children: [
-          // 음식명
-          Expanded(
-            child: Text(
-              item.customFoodName,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: AppColors.darkGray
-              )
-            )
-          ),
-          // 섭취량
-          if (item.intakeAmountG != null) ...[
-            Text(
-              '${item.intakeAmountG!.toStringAsFixed(0)}g',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textMedium
-              )
-            ),
-            const SizedBox(width: 10)
-          ],
-          // 반응 칩
-          if (reaction != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: (_reactionColors[reaction] ?? AppColors.primaryLight)
-                  .withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20)
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _reactionIcons[reaction] ?? LucideIcons.meh,
-                    size: 13,
-                    color: _reactionColors[reaction] ?? AppColors.primaryLight
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    _reactionLabels[reaction] ?? '',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: _reactionColors[reaction] ?? AppColors.primaryLight
-                    )
-                  )
-                ]
-              )
-            )
-        ]
-      )
-    );
-  }
-}
-
-// 사진 가로 스크롤
-class _PhotoRow extends StatelessWidget {
-  final List<MealRecordPhoto> photos;
-
-  const _PhotoRow({required this.photos});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 100,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: photos.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (context, i) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.network(
-              photos[i].photoUrl,
-              width: 100, height: 100,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(
-                width: 100, height: 100,
-                color: AppColors.surfaceMuted,
-                child: const Icon(
-                  LucideIcons.imageOff,
-                  color: AppColors.grayCaption
-                )
-              )
-            )
-          );
-        }
       )
     );
   }

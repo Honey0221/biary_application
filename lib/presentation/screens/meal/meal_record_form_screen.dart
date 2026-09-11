@@ -1,43 +1,35 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:honey/core/constants/app_colors.dart';
-import 'package:honey/core/utils/date_formatter.dart';
-import 'package:honey/data/models/food_search_result.dart';
+import 'package:honey/core/utils/age_calculator.dart';
 import 'package:honey/data/models/meal_item.dart';
 import 'package:honey/data/models/meal_record.dart';
 import 'package:honey/data/models/meal_record_photo.dart';
-import 'package:honey/presentation/screens/child/child_switch_sheet.dart';
+import 'package:honey/data/services/analysis_service.dart';
+import 'package:honey/main.dart';
+import 'package:honey/presentation/screens/child/widgets/child_switch_sheet.dart';
+import 'package:honey/presentation/screens/meal/widgets/child_selector.dart';
+import 'package:honey/presentation/screens/meal/widgets/food_entry.dart';
+import 'package:honey/presentation/screens/meal/widgets/food_item_card.dart';
+import 'package:honey/presentation/screens/meal/widgets/meal_date_picker.dart';
+import 'package:honey/presentation/screens/meal/widgets/photo_thumbnail.dart';
 import 'package:honey/presentation/widgets/biary_button.dart';
 import 'package:honey/presentation/widgets/biary_dialog.dart';
 import 'package:honey/presentation/widgets/biary_select_button.dart';
 import 'package:honey/presentation/widgets/biary_text_field.dart';
-import 'package:honey/presentation/widgets/food_search_field.dart';
 import 'package:honey/presentation/widgets/loading_overlay.dart';
 import 'package:honey/providers/ui_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/utils/analysis_flow_helper.dart';
+import '../../../core/utils/nutrient_calculator.dart';
+import '../../../data/models/analysis_result.dart';
+import '../../../data/models/child_profile.dart';
+import '../../../providers/analysis_provider.dart';
 import '../../../providers/child_profile_provider.dart';
 import '../../../providers/meal_record_provider.dart';
-
-// 음식 항목 로컬 상태 클래스
-class _FoodEntry {
-  FoodSearchResult? selectedFood;
-  final TextEditingController nameCtrl;
-  final TextEditingController amountCtrl;
-  String? reactionType; // 'good' | 'normal' | 'bad' | null
-
-  _FoodEntry({String name = '', String amount = '', this.reactionType})
-    : nameCtrl = TextEditingController(text: name),
-      amountCtrl = TextEditingController(text: amount);
-
-  void dispose() {
-    nameCtrl.dispose();
-    amountCtrl.dispose();
-  }
-}
+import '../analysis/widgets/analysis_loading_overlay.dart';
 
 class MealRecordFormScreen extends ConsumerStatefulWidget {
   // null -> 신규 / non-null -> 수정(S-08)
@@ -55,7 +47,7 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
 
   late DateTime _selectedDate;
   late String _selectedMealType;
-  late List<_FoodEntry> _foodEntries;
+  late List<FoodEntry> _foodEntries;
 
   late List<MealRecordPhoto> _existingPhotos;
   final List<String> _deletedPhotoIds = [];
@@ -83,17 +75,17 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
       _memoCtrl.text = r.memo ?? '';
       _existingPhotos = List.of(r.photos);
       _foodEntries = r.items.map((item) =>
-          _FoodEntry(
+          FoodEntry(
               name: item.customFoodName,
               amount: item.intakeAmountG?.toStringAsFixed(0) ?? '',
               reactionType: item.reactionType
           )).toList();
-      if (_foodEntries.isEmpty) _foodEntries.add(_FoodEntry());
+      if (_foodEntries.isEmpty) _foodEntries.add(FoodEntry());
     } else {
       _selectedDate = DateTime.now();
       _selectedMealType = 'breakfast';
       _existingPhotos = [];
-      _foodEntries = [_FoodEntry()];
+      _foodEntries = [FoodEntry()];
     }
   }
 
@@ -207,7 +199,7 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
     try {
       final repo = ref.read(mealRecordRepositoryProvider);
       if (_isEditMode) {
-        // 삭제 요청된 기존 사진 처리
+        // 수정 저장 : 삭제 요청된 기존 사진 처리 -> 이전 화면 복귀
         for (final id in _deletedPhotoIds) {
           await repo.deletePhoto(id);
         }
@@ -215,13 +207,16 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
           record: record,
           localPhotosPaths: _localPhotoPaths
         );
+        if (mounted) context.pop();
       } else {
-        await repo.createRecord(
+        // 신규 저장 : 분석 여부 확인
+        final saved = await repo.createRecord(
           record: record,
           localPhotoPaths: _localPhotoPaths
         );
+        if (!mounted) return;
+        _showAnalysisDialog(saved, child);
       }
-      if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -249,6 +244,83 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
       cancelLabel: '계속 작성',
       onConfirm: () => context.pop()
     );
+  }
+
+  // 신규 저장 후 분석 시작 확인 다이얼로그
+  Future<void> _showAnalysisDialog(MealRecord saved, ChildProfile child) async {
+    await BiaryDialog.show(
+      context,
+      title: '식단 기록이 저장되었어요',
+      content: '지금 바로 영양 분석을 하실래요?',
+      confirmLabel: '분석하기',
+      cancelLabel: '나중에',
+      onConfirm: () => _startAnalysis(saved, child),
+      onCancel: () {
+        context.pop();
+        context.go('/home');
+      }
+    );
+  }
+
+  // 분석 오버레이 실행 -> 캐시 확인 -> Edge Function 호출 -> 화면 이동
+  Future<void> _startAnalysis(MealRecord saved, ChildProfile child) async {
+    final analysisRepo = ref.read(analysisRepositoryProvider);
+    final cached = await analysisRepo.getAnalysis(saved.id!);
+
+    if (!mounted) return;
+    if (!AnalysisFlowHelper.needsNewAnalysis(cached, saved.updatedAt)) {
+      // 캐시 HIT -> 바로 이동
+      _navigateToResult(cached!, child);
+      return;
+    }
+
+    // 캐시 MISS -> 오버레이 + Edge function
+    final entries = _foodEntries
+      .where((e) => e.selectedFood != null)
+      .map((e) => FoodIntakeEntry(
+        food: e.selectedFood!,
+        intakeAmountG: double.tryParse(e.amountCtrl.text.trim()) ?? 100
+      ))
+      .toList();
+
+    final isSubscriber = false; // TODO: 구독 여부 provider 연결
+
+    final response = await AnalysisLoadingOverlay.show<AnalysisResponse>(
+      context, ref,
+      childName: child.name,
+      taskBuilder: (onProgress) => AnalysisService.analyze(
+        isSubscriber: isSubscriber,
+        entries: entries,
+        childId: child.id,
+        childAgeMonths: AgeCalculator.toMonths(child.birthDate),
+        childGender: child.gender,
+        onProgress: onProgress
+      )
+    );
+
+    if (response == null || !mounted) return;
+
+    // 분석 결과 저장
+    final analysisResult = await AnalysisFlowHelper.buildAndSave(
+      response: response,
+      mealRecordId: saved.id!,
+      childId: child.id,
+      targetDate: saved.mealDate,
+      mealType: saved.mealType,
+      repo: analysisRepo
+    );
+
+    if (mounted) _navigateToResult(analysisResult, child);
+  }
+
+  void _navigateToResult(AnalysisResult result, ChildProfile child) {
+    final isGuest = supabase.auth.currentUser == null;
+    context.go('/analysis/result', extra: {
+      'result': result,
+      'childName': child.name,
+      'isGuest': isGuest,
+      'isModified': false // 신규 저장 시 항상 false
+    });
   }
 
   @override
@@ -284,7 +356,7 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
             children: [
               _sectionLabel('아이 선택'),
               const SizedBox(height: 8),
-              _ChildSelector(
+              ChildSelector(
                 child: selectedChild,
                 onTap: () => ChildSwitchSheet.show(context)
               ),
@@ -292,7 +364,7 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
 
               _sectionLabel('날짜'),
               const SizedBox(height: 8),
-              _DatePicker(date: _selectedDate, onTap: _pickDate),
+              MealDatePicker(date: _selectedDate, onTap: _pickDate),
               const SizedBox(height: 20),
 
               _sectionLabel('식사 구분'),
@@ -323,7 +395,7 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
                   _sectionLabel('음식 목록'),
                   TextButton.icon(
                     onPressed: () => setState(() {
-                      _foodEntries.add(_FoodEntry());
+                      _foodEntries.add(FoodEntry());
                       _foodListError = null;
                     }),
                     icon: const Icon(LucideIcons.plus, size: 16),
@@ -349,7 +421,7 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
               ...List.generate(_foodEntries.length, (i) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _FoodItemCard(
+                  child: FoodItemCard(
                     foodEntry: _foodEntries[i],
                     canDelete: _foodEntries.length > 1,
                     onRemove: () => setState(() {
@@ -398,14 +470,14 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
         // 기존 사진 (수정 모드)
         ..._existingPhotos
           .where((p) => !_deletedPhotoIds.contains(p.id))
-          .map((p) => _PhotoThumbnail.network(
+          .map((p) => PhotoThumbnail.network(
             url: p.photoUrl,
             onRemove: () => setState(() => _deletedPhotoIds.add(p.id))
           )
         ),
         // 새로 추가한 로컬 사진
         ..._localPhotoPaths.asMap().entries.map((e) =>
-          _PhotoThumbnail.local(
+          PhotoThumbnail.local(
             path: e.value,
             onRemove: () => setState(() => _localPhotoPaths.removeAt(e.key))
           )
@@ -439,277 +511,4 @@ class _MealRecordFormScreenState extends ConsumerState<MealRecordFormScreen> {
       color: AppColors.darkGray
     )
   );
-}
-
-// 아이 선택 위젯
-class _ChildSelector extends StatelessWidget {
-  final dynamic child;
-  final VoidCallback onTap;
-
-  const _ChildSelector({required this.child, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasChild = child != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: hasChild ? AppColors.primaryBrown : AppColors.inputBorder
-          ),
-          borderRadius: BorderRadius.circular(10),
-          color: Colors.white
-        ),
-        child: Row(
-          children: [
-            Icon(
-              LucideIcons.baby,
-              size: 18,
-              color: hasChild ? AppColors.primaryBrown : AppColors.grayCaption
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                hasChild ? child.name : '아이를 선택해주세요',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: hasChild ? FontWeight.w600 : FontWeight.normal,
-                  color: hasChild ? AppColors.darkGray : AppColors.grayCaption
-                )
-              )
-            ),
-            const Icon(
-              LucideIcons.chevronDown,
-              size: 16,
-              color: AppColors.grayCaption
-            )
-          ]
-        )
-      )
-    );
-  }
-}
-
-// 날짜 선택 위젯
-class _DatePicker extends StatelessWidget {
-  final DateTime date;
-  final VoidCallback onTap;
-
-  const _DatePicker({required this.date, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final formatted = DateFormatter.toDateLabel(date);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.inputBorder),
-          borderRadius: BorderRadius.circular(10),
-          color: Colors.white
-        ),
-        child: Row(
-          children: [
-            const Icon(LucideIcons.calendar, size: 18, color: AppColors.grayCaption),
-            const SizedBox(width: 8),
-            Text(formatted,
-              style: const TextStyle(fontSize: 15, color: AppColors.darkGray)
-            )
-          ]
-        )
-      )
-    );
-  }
-}
-
-// 음식 항목 카드
-class _FoodItemCard extends ConsumerWidget {
-  final _FoodEntry foodEntry;
-  final bool canDelete;
-  final VoidCallback onRemove;
-  final VoidCallback onFoodChanged;
-  final ValueChanged<String?> onReactionChanged;
-
-  const _FoodItemCard({
-    required this.foodEntry,
-    required this.canDelete,
-    required this.onRemove,
-    required this.onFoodChanged,
-    required this.onReactionChanged
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.inputBorder),
-        borderRadius: BorderRadius.circular(10),
-        color: Colors.white
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: FoodSearchField(
-                  controller: foodEntry.nameCtrl,
-                  selectedFood: foodEntry.selectedFood,
-                  hintText: '음식명 검색 또는 직접 입력',
-                  onSelected: (result) {
-                    foodEntry.nameCtrl.text = result.foodName;
-                    foodEntry.selectedFood = result;
-                    onFoodChanged();
-                  },
-                  onChanged: onFoodChanged,
-                )
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: foodEntry.amountCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: '섭취량(g)',
-                    hintStyle: TextStyle(color: AppColors.grayCaption),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true
-                  ),
-                  style: const TextStyle(fontSize: 15)
-                )
-              ),
-              if (canDelete) ...[
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: onRemove,
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(
-                      LucideIcons.trash2,
-                      size: 18,
-                      color: AppColors.grayCaption
-                    )
-                  )
-                )
-              ]
-            ]
-          ),
-          const Divider(height: 16, color: AppColors.divider),
-          Row(
-            children: [
-              const Text('반응', style: TextStyle(
-                fontSize: 12, color: AppColors.grayCaption
-              )),
-              const SizedBox(width: 12),
-              ..._buildReactionChips()
-            ]
-          )
-        ]
-      )
-    );
-  }
-
-  List<Widget> _buildReactionChips() {
-    const types = ['good', 'normal', 'bad'];
-    const labels = {'good': '좋아요', 'normal': '보통', 'bad': '거부'};
-    const icons = {
-      'good': LucideIcons.smile,
-      'normal': LucideIcons.meh,
-      'bad': LucideIcons.frown
-    };
-
-    return types.map((type) {
-      final selected = foodEntry.reactionType == type;
-      return Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: GestureDetector(
-          onTap: () => onReactionChanged(selected ? null : type),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.primaryBrown : Colors.transparent,
-              border: Border.all(
-                color: selected ? AppColors.primaryBrown : AppColors.inputBorder
-              ),
-              borderRadius: BorderRadius.circular(20)
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icons[type]!, size: 13,
-                  color: selected ? Colors.white : AppColors.grayCaption),
-                const SizedBox(width: 4),
-                Text(labels[type]!, style: TextStyle(
-                  fontSize: 12,
-                  color: selected ? Colors.white : AppColors.grayCaption)
-                )
-              ]
-            )
-          )
-        )
-      );
-    }).toList();
-  }
-}
-
-// 사진 썸네일
-class _PhotoThumbnail extends StatelessWidget {
-  final Widget image;
-  final VoidCallback onRemove;
-
-  const _PhotoThumbnail._({
-    required this.image, required this.onRemove
-  });
-
-  factory _PhotoThumbnail.local({
-    required String path,
-    required VoidCallback onRemove
-  }) => _PhotoThumbnail._(
-    image: Image.file(File(path),
-        width: 80, height: 80, fit: BoxFit.cover
-    ), onRemove: onRemove
-  );
-
-  factory _PhotoThumbnail.network({
-    required String url,
-    required VoidCallback onRemove
-  }) => _PhotoThumbnail._(
-    image: Image.network(url,
-      width: 80, height: 80, fit: BoxFit.cover
-    ), onRemove: onRemove
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: image
-        ),
-        Positioned(
-          top: 2, right: 2,
-          child: GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              width: 20, height: 20,
-              decoration: const BoxDecoration(
-                color: Colors.black54,
-                shape: BoxShape.circle
-              ),
-              child: const Icon(LucideIcons.x, size: 12, color: Colors.white)
-            )
-          )
-        )
-      ]
-    );
-  }
 }

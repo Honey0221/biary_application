@@ -11,7 +11,7 @@ import 'package:honey/presentation/widgets/biary_dialog.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/models/food_search_result.dart';
-import '../../widgets/food_search_field.dart';
+import '../meal/widgets/food_search_field.dart';
 
 class GuestEntryScreen extends StatefulWidget {
   const GuestEntryScreen({super.key});
