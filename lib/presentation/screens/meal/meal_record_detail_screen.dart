@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive/hive.dart';
 import 'package:honey/core/constants/app_colors.dart';
 import 'package:honey/core/utils/age_calculator.dart';
 import 'package:honey/core/utils/date_formatter.dart';
 import 'package:honey/data/services/analysis_service.dart';
+import 'package:honey/main.dart';
 import 'package:honey/presentation/screens/meal/widgets/food_item_tile.dart';
 import 'package:honey/presentation/screens/meal/widgets/meal_header_card.dart';
 import 'package:honey/presentation/screens/meal/widgets/photo_row.dart';
@@ -66,6 +68,9 @@ class MealRecordDetailScreen extends ConsumerWidget {
   }
 }
 
+// 분석하기 버튼 상태
+enum _AnalysisButtonState { loading, ready, done, reanalyze }
+
 // 본문 위젯
 class _DetailBody extends ConsumerWidget {
   final MealRecord record;
@@ -118,24 +123,33 @@ class _DetailBody extends ConsumerWidget {
       return;
     }
 
-    final analysisRepo = ref.read(analysisRepositoryProvider);
-    final cached = await analysisRepo.getAnalysis(record.id!);
-
-    if (!context.mounted) return;
-
-    if (!AnalysisFlowHelper.needsNewAnalysis(cached, record.updatedAt)) {
-      // 캐시 HIT → 바로 이동
-      context.go('/analysis/result', extra: {
-        'result': cached!,
-        'childName': child.name,
-        'isGuest': false,
-        'isModified': false,
-      });
-      return;
+    final isGuest = supabase.auth.currentUser == null;
+    if (isGuest) {
+      final now = DateTime.now();
+      final key = 'analysis_${now.year}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+      final box = Hive.box<int>('guestAnalysisBox');
+      final count = box.get(key, defaultValue: 0)!;
+      if (count >= 3) {
+        if (context.mounted) {
+          BiaryDialog.show(
+            context,
+            title: '오늘 분석 횟수를 모두 사용하셨어요',
+            content: '게스트는 하루 3회까지 분석할 수 있어요.\n회원가입하면 무제한 이용 가능해요',
+            confirmLabel: '회원가입',
+            cancelLabel: '닫기',
+            onConfirm: () => context.go('/signup')
+          );
+        }
+        return;
+      }
+      await box.put(key, count + 1);
     }
 
-    // 캐시 MISS → 오버레이 + Edge Function
     const isSubscriber = false; // TODO: 구독 여부 provider 연결
+
+    if (!context.mounted) return;
 
     final response = await AnalysisLoadingOverlay.show<AnalysisResponse>(
       context, ref,
@@ -152,6 +166,7 @@ class _DetailBody extends ConsumerWidget {
 
     if (response == null || !context.mounted) return;
 
+    final analysisRepo = ref.read(analysisRepositoryProvider);
     final analysisResult = await AnalysisFlowHelper.buildAndSave(
       response: response,
       mealRecordId: record.id!,
@@ -161,18 +176,34 @@ class _DetailBody extends ConsumerWidget {
       repo: analysisRepo
     );
 
+    ref.invalidate(analysisProvider(record.id!));
+
     if (context.mounted) {
       context.go('/analysis/result', extra: {
         'result': analysisResult,
         'childName': child.name,
-        'isGuest': false,
-        'isModified': false,
+        'isGuest': isGuest,
+        'isModified': false
       });
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final analysisAsync = ref.watch(analysisProvider(record.id!));
+
+    final buttonState = analysisAsync.when(
+      loading: () => _AnalysisButtonState.loading,
+      error: (_, _) => _AnalysisButtonState.ready,
+      data: (result) {
+        if (result == null) return _AnalysisButtonState.ready;
+        if (AnalysisFlowHelper.needsNewAnalysis(result, record.updatedAt)) {
+          return _AnalysisButtonState.reanalyze;
+        }
+        return _AnalysisButtonState.done;
+      }
+    );
+
     return Scaffold(
       backgroundColor: AppColors.warmCream,
       appBar: AppBar(
@@ -282,14 +313,31 @@ class _DetailBody extends ConsumerWidget {
                 )
               )
             ],
-
             const SizedBox(height: 36),
 
-            // 5. 영양 분석 버튼
-            BiaryButton(
-              label: '영양 분석하기',
-              onPressed: () => _onAnalysis(context, ref),
-            )
+            // 5. 영양 분석 버튼 (상태별 디자인 변화)
+            switch (buttonState) {
+              _AnalysisButtonState.loading => BiaryButton(
+                label: '분석 정보 확인 중',
+                onPressed: null,
+                isLoading: true
+              ),
+              _AnalysisButtonState.ready => BiaryButton(
+                label: '영양 분석하기',
+                onPressed: () => _onAnalysis(context, ref)
+              ),
+              _AnalysisButtonState.done => BiaryButton(
+                label: '분석 완료',
+                onPressed: null,
+                icon: const Icon(LucideIcons.checkCircle, size: 16)
+              ),
+              _AnalysisButtonState.reanalyze => BiaryButton(
+                label: '재분석하기',
+                type: BiaryButtonType.outlined,
+                onPressed: () => _onAnalysis(context, ref),
+                icon: const Icon(LucideIcons.refreshCw, size: 16)
+              )
+            }
           ]
         )
       )
